@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.17</title>
+    <title>Блокнот - v1.1.18</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -138,23 +138,26 @@
         }
         
         .note-content {
-            padding: 14px 16px;
+            padding: 12px 16px 8px 16px;
             cursor: pointer;
         }
         
         .note-date { 
             font-size: 0.78em; 
             color: var(--text-muted); 
-            margin-bottom: 6px; 
+            margin-bottom: 4px; 
             display: flex; 
             justify-content: space-between; 
         }
         
+        /* Залізно в один рядок, сувора висота і трикрапка */
         .note-preview { 
             font-size: 0.95em; 
-            white-space: nowrap; /* Суворо в один рядок */
-            overflow: hidden; /* Ховаємо те, що не влізло */
-            text-overflow: ellipsis; /* Додаємо трикрапку в кінці */
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            height: 22px;
+            line-height: 22px;
         }
         
         .note-actions {
@@ -433,7 +436,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.17</b>
+            Версія додатку: <b>v1.1.18</b>
         </div>
     </div>
 
@@ -747,7 +750,6 @@
                     notes.forEach((note, index) => {
                         const dateStr = note.date || new Date(note.id).toLocaleString('uk-UA');
                         
-                        // Захист від зламу верстки (екранування HTML-символів) + прибираємо переноси рядків для прев'ю
                         let rawText = note.text ? note.text : 'Порожня нотатка...';
                         let previewText = rawText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, " ");
 
@@ -873,7 +875,6 @@
                     const card = document.createElement('div');
                     card.className = 'note-card';
                     
-                    // Тут теж краще екранувати, щоб кошик не ламався
                     let rawText = note.text ? note.text : '';
                     let previewText = rawText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
