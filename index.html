@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.24</title>
+    <title>Блокнот - v1.1.25</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -447,7 +447,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.24</b>
+            Версія додатку: <b>v1.1.25</b>
         </div>
     </div>
 
@@ -786,8 +786,8 @@
                 const store = transaction.objectStore("notes");
                 store.getAll().onsuccess = function(event) {
                     let notes = event.target.result;
-                    // Фільтруємо повністю порожні нотатки з прев'ю
-                    notes = notes.filter(n => n.text && n.text.trim() !== '');
+                    // Фільтруємо ігноруючи системний/невалідний код із таблиці
+                    notes = notes.filter(n => n.text && n.text.trim() !== '' && !n.text.includes('function doGet'));
 
                     if (activeFolderFilter !== 'Всі') {
                         notes = notes.filter(n => (n.folder || DEFAULT_FOLDER) === activeFolderFilter);
@@ -849,24 +849,26 @@
                 const tableData = await response.json();
                 if (!Array.isArray(tableData)) { alert("Некоректні дані з таблиці."); return; }
 
+                // Якщо таблиця порожня або повернула одне сміття — не затираємо локальні записи
+                const validTableNotes = tableData.filter(item => item.text && item.text.trim() !== '' && !item.text.includes('function doGet'));
+                if (validTableNotes.length === 0) {
+                    alert("У таблиці немає валідних записів для синхронізації.");
+                    return;
+                }
+
                 const transaction = db.transaction(["notes"], "readwrite");
                 const store = transaction.objectStore("notes");
 
-                // Очищаємо локальні нотатки перед синхронізацією, щоб позбутися сміття та завантажити чисті актуальні дані з таблиці
-                store.clear();
-
-                tableData.forEach(item => {
-                    if (item.text && item.text.trim() !== '') {
-                        let parsedId = Number(item.id) || Date.parse(item.date) || (Date.now() + Math.floor(Math.random() * 1000));
-                        store.put({ 
-                            id: parsedId, 
-                            text: item.text, 
-                            date: item.date,
-                            folder: item.folder || DEFAULT_FOLDER,
-                            isPinned: false,
-                            order: parsedId 
-                        });
-                    }
+                validTableNotes.forEach(item => {
+                    let parsedId = Number(item.id) || Date.parse(item.date) || (Date.now() + Math.floor(Math.random() * 1000));
+                    store.put({ 
+                        id: parsedId, 
+                        text: item.text, 
+                        date: item.date,
+                        folder: item.folder || DEFAULT_FOLDER,
+                        isPinned: false,
+                        order: parsedId 
+                    });
                 });
 
                 transaction.oncomplete = function() {
