@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.25</title>
+    <title>Блокнот - v1.1.26</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -447,7 +447,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.25</b>
+            Версія додатку: <b>v1.1.26</b>
         </div>
     </div>
 
@@ -786,7 +786,6 @@
                 const store = transaction.objectStore("notes");
                 store.getAll().onsuccess = function(event) {
                     let notes = event.target.result;
-                    // Фільтруємо ігноруючи системний/невалідний код із таблиці
                     notes = notes.filter(n => n.text && n.text.trim() !== '' && !n.text.includes('function doGet'));
 
                     if (activeFolderFilter !== 'Всі') {
@@ -847,12 +846,14 @@
             try {
                 const response = await fetch(scriptUrl);
                 const tableData = await response.json();
-                if (!Array.isArray(tableData)) { alert("Некоректні дані з таблиці."); return; }
+                if (!Array.isArray(tableData)) { 
+                    alert("Синхронізація: таблиця порожня або формат не підтримується."); 
+                    return; 
+                }
 
-                // Якщо таблиця порожня або повернула одне сміття — не затираємо локальні записи
                 const validTableNotes = tableData.filter(item => item.text && item.text.trim() !== '' && !item.text.includes('function doGet'));
                 if (validTableNotes.length === 0) {
-                    alert("У таблиці немає валідних записів для синхронізації.");
+                    alert("У таблиці немає дійсних записів для завантаження.");
                     return;
                 }
 
@@ -873,12 +874,12 @@
 
                 transaction.oncomplete = function() {
                     loadNotesList();
-                    alert("Синхронізація успішна! Дані оновлено з таблиці.");
+                    alert("Синхронізація успішна! Записи підтягнуто з таблиці.");
                     closeSettings();
                 };
             } catch (e) {
-                alert("Помилка синхронізації з таблицею.");
                 console.error(e);
+                alert("Помилка синхронізації. Перевірте правильність посилання Web App URL у налаштуваннях.");
             }
         }
 
