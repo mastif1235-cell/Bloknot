@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот</title>
+    <title>Блокнот - v1.1.11</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -40,9 +40,7 @@
             --pinned-bg: #fff5e6;
         }
 
-        * { 
-            box-sizing: border-box; 
-        }
+        * { box-sizing: border-box; }
 
         body {
             background-color: var(--bg-color);
@@ -53,7 +51,7 @@
             transition: background-color 0.3s, color 0.3s;
         }
 
-        #listView, #editorView, #settingsView { 
+        #listView, #editorView, #settingsView, #trashView { 
             display: none; 
             padding: 16px; 
             height: 100vh; 
@@ -115,7 +113,7 @@
             color: var(--text-muted);
         }
 
-        #notesList { 
+        #notesList, #trashList { 
             flex: 1; 
             overflow-y: auto; 
             display: flex; 
@@ -397,11 +395,20 @@
             <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
         </div>
 
-        <button class="btn btn-primary" style="margin-top: 10px;" onclick="saveSettings()">Зберегти налаштування</button>
+        <button class="btn" style="margin-bottom: 10px;" onclick="showTrash()">🗑️ Кошик видалених нотаток</button>
+        <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.10</b>
+            Версія додатку: <b>v1.1.11</b>
         </div>
+    </div>
+
+    <div id="trashView">
+        <div class="header-row">
+            <h2>Кошик</h2>
+            <button class="btn" style="width: auto; padding: 0 16px;" onclick="showSettings()">Назад</button>
+        </div>
+        <div id="trashList"></div>
     </div>
 
     <script>
@@ -488,11 +495,14 @@
 
         function initDB() {
             try {
-                const request = window.indexedDB.open("NotepadDB", 4); 
+                const request = window.indexedDB.open("NotepadDB", 5); 
                 request.onupgradeneeded = function(event) {
                     db = event.target.result;
                     if (!db.objectStoreNames.contains("notes")) {
                         db.createObjectStore("notes", { keyPath: "id" });
+                    }
+                    if (!db.objectStoreNames.contains("trash")) {
+                        db.createObjectStore("trash", { keyPath: "id" });
                     }
                 };
                 request.onsuccess = function(event) {
@@ -567,7 +577,7 @@
                 method: "POST",
                 mode: "no-cors",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: text, date: dateStr, folder: folder })
+                body: JSON.stringify({ id: currentNoteId, text: text, date: dateStr, folder: folder })
             }).then(() => {
                 alert("Нотатку збережено та надіслано в таблицю!");
             }).catch(err => {
@@ -578,15 +588,52 @@
 
         function deleteNote(id, event) {
             if(event) event.stopPropagation(); 
-            if (confirm("Точно видалити цей запис?")) {
-                db.transaction(["notes"], "readwrite").objectStore("notes").delete(id);
+            if (!confirm("Точно видалити цей запис?")) return;
+
+            if (!db) return;
+            const tx = db.transaction(["notes", "trash"], "readwrite");
+            const notesStore = tx.objectStore("notes");
+            const trashStore = tx.objectStore("trash");
+
+            notesStore.get(id).onsuccess = function(e) {
+                const note = e.target.result;
+                if (note) {
+                    // Додаємо в кошик
+                    trashStore.put(note);
+                    notesStore.delete(id);
+
+                    // Обмежуємо кошик 30 записами
+                    trashStore.getAll().onsuccess = function(ev) {
+                        let trashItems = ev.target.result;
+                        if (trashItems.length > 30) {
+                            trashItems.sort((a, b) => a.id - b.id); // Видаляємо найстаріші надлишки
+                            for (let i = 0; i < trashItems.length - 30; i++) {
+                                trashStore.delete(trashItems[i].id);
+                            }
+                        }
+                    };
+
+                    // Відправляємо запит на видалення з Google Таблиці
+                    const scriptUrl = localStorage.getItem('googleScriptUrl');
+                    if (scriptUrl) {
+                        fetch(scriptUrl, {
+                            method: "POST",
+                            mode: "no-cors",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "delete", id: id })
+                        }).catch(err => console.log("Помилка видалення в таблиці", err));
+                    }
+                }
+            };
+
+            tx.oncomplete = function() {
                 loadNotesList();
-            }
+            };
         }
 
         function deleteCurrentNote() {
-            if (currentNoteId && confirm("Точно видалити цей запис?")) {
-                if (db) db.transaction(["notes"], "readwrite").objectStore("notes").delete(currentNoteId);
+            if (currentNoteId) {
+                deleteNote(currentNoteId);
                 goBack();
             }
         }
@@ -633,6 +680,7 @@
                     if (activeFolderFilter !== 'Всі') {
                         notes = notes.filter(n => (n.folder || DEFAULT_FOLDER) === activeFolderFilter);
                     }
+                    // Найновіші зверху (сортування від більшого ID / order до меншого)
                     notes.sort((a, b) => {
                         if (a.isPinned && !b.isPinned) return -1;
                         if (!a.isPinned && b.isPinned) return 1;
@@ -679,6 +727,7 @@
         function showEditor() {
             document.getElementById('listView').classList.remove('active');
             document.getElementById('settingsView').classList.remove('active');
+            document.getElementById('trashView').classList.remove('active');
             document.getElementById('editorView').classList.add('active');
         }
 
@@ -687,6 +736,7 @@
             autoSave();
             currentNoteId = null;
             document.getElementById('editorView').classList.remove('active');
+            document.getElementById('trashView').classList.remove('active');
             document.getElementById('listView').classList.add('active');
             loadNotesList();
         }
@@ -694,16 +744,51 @@
         function showSettings() {
             document.getElementById('listView').classList.remove('active');
             document.getElementById('editorView').classList.remove('active');
+            document.getElementById('trashView').classList.remove('active');
             document.getElementById('settingsView').classList.add('active');
         }
 
         function closeSettings() {
             document.getElementById('settingsView').classList.remove('active');
+            document.getElementById('trashView').classList.remove('active');
             if (currentNoteId) {
                 document.getElementById('editorView').classList.add('active');
             } else {
                 document.getElementById('listView').classList.add('active');
             }
+        }
+
+        function showTrash() {
+            document.getElementById('settingsView').classList.remove('active');
+            document.getElementById('trashView').classList.add('active');
+            loadTrashList();
+        }
+
+        function loadTrashList() {
+            if (!db) return;
+            const transaction = db.transaction(["trash"], "readonly");
+            const store = transaction.objectStore("trash");
+            store.getAll().onsuccess = function(event) {
+                const trashItems = event.target.result;
+                trashItems.sort((a, b) => b.id - a.id);
+                const list = document.getElementById('trashList');
+                list.innerHTML = '';
+                if (trashItems.length === 0) {
+                    list.innerHTML = `<div style="text-align:center; color:var(--text-muted); margin-top:20px;">Кошик порожній</div>`;
+                    return;
+                }
+                trashItems.forEach(note => {
+                    const card = document.createElement('div');
+                    card.className = 'note-card';
+                    card.innerHTML = `
+                        <div class="note-content">
+                            <div class="note-date"><span>${note.date || ''}</span></div>
+                            <div class="note-preview">${note.text || ''}</div>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+            };
         }
 
         function saveSettings() {
