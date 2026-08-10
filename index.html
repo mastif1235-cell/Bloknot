@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Блокнот</title>
     
-    <!-- Посилання на PWA Маніфест та колір шапки -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,7 +12,6 @@
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3789/3789820.png">
 
     <style>
-        /* Цветовые темы */
         :root {
             --bg-color: #121212;
             --surface-color: #1e1e1e;
@@ -47,7 +45,7 @@
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             margin: 0;
             padding: 0;
             transition: background-color 0.3s, color 0.3s;
@@ -652,39 +650,37 @@
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
+            // ВАЖНО: Отключаем баг Android с дублированием
+            recognition.continuous = false;
+            recognition.interimResults = false;
 
             recognition.onresult = function(event) {
-                let finalTranscript = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript + ' ';
-                    }
-                }
+                // Берем только самый свежий результат
+                const finalTranscript = event.results[0][0].transcript;
                 if (finalTranscript) {
                     const editor = document.getElementById('noteEditor');
-                    editor.value = editor.value + (editor.value.endsWith(' ') || editor.value === '' ? '' : ' ') + finalTranscript;
+                    const currentText = editor.value;
+                    editor.value = currentText + (currentText.endsWith(' ') || currentText === '' ? '' : ' ') + finalTranscript.trim();
                     autoSave();
                 }
             };
 
             recognition.onerror = function(event) {
                 console.error("Голосова помилка: ", event.error);
-                if (isRecording) toggleMic();
+                if (event.error !== 'no-speech') {
+                    if (isRecording) toggleMic();
+                }
             };
             
             recognition.onend = function() {
-                if (isRecording) recognition.start();
+                // Автоматически перезапускаем микрофон, если запись не была остановлена кнопкой
+                if (isRecording) {
+                    recognition.start();
+                }
             };
         }
 
         function toggleMic() {
-            if (window.location.protocol === 'content:' || window.location.protocol === 'file:') {
-                alert("Голосовий ввід ЗАБЛОКОВАНО! Відкрийте сайт через розгорнуту сторінку GitHub Pages (з з'єднанням https://).");
-                return;
-            }
-
             if (!recognition) {
                 alert("Ваш браузер не підтримує голосовий ввід.");
                 return;
@@ -692,16 +688,16 @@
 
             const btn = document.getElementById('micBtn');
             if (isRecording) {
+                isRecording = false;
                 recognition.stop();
                 btn.classList.remove('btn-recording');
                 btn.innerText = "🎤 Голос";
-                isRecording = false;
             } else {
+                isRecording = true;
                 recognition.lang = document.getElementById('langSelect').value;
                 recognition.start();
                 btn.classList.add('btn-recording');
                 btn.innerText = "🛑 Стоп";
-                isRecording = true;
             }
         }
 
@@ -742,13 +738,14 @@
             fetch(scriptUrl, {
                 method: 'POST',
                 mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
+                // ВАЖНО: Изменен заголовок, чтобы Google Script без ошибок съедал JSON
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ text: text, date: dateStr })
             }).then(() => {
-                alert("Надіслано в таблицю!");
+                alert("Успішно надіслано в таблицю!");
             }).catch(error => {
                 console.error("Помилка:", error);
-                alert("Помилка при відправці.");
+                alert("Помилка при відправці. Перевір інтернет.");
             }).finally(() => {
                 btn.innerText = originalText;
                 btn.disabled = false;
