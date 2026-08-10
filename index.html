@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.20</title>
+    <title>Блокнот - v1.1.21</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -130,6 +130,10 @@
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
+            overflow: hidden;
+            /* Суворий захист висоти картки на головному екрані */
+            height: 95px;
+            max-height: 95px;
         }
         
         .note-card.pinned {
@@ -138,28 +142,28 @@
         }
         
         .note-content {
-            padding: 10px 16px 8px 16px;
+            padding: 10px 16px 4px 16px;
             cursor: pointer;
+            height: 52px;
+            overflow: hidden;
         }
         
         .note-date { 
             font-size: 0.75em; 
             color: var(--text-muted); 
-            margin-bottom: 4px; 
+            margin-bottom: 2px; 
             display: flex; 
             justify-content: space-between; 
         }
         
-        /* Залізно в один рядок з трикрапкою, клікабельність відновлено повністю */
+        /* Залізно суворо в один рядок з трикрапкою */
         .note-preview { 
             font-size: 0.9em; 
-            display: -webkit-box;
-            -webkit-line-clamp: 1;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            word-break: break-all;
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
             line-height: 20px;
+            height: 20px;
         }
         
         .note-actions {
@@ -439,7 +443,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.20</b>
+            Версія додатку: <b>v1.1.21</b>
         </div>
     </div>
 
@@ -761,8 +765,10 @@
 
                         const card = document.createElement('div');
                         card.className = `note-card ${note.isPinned ? 'pinned' : ''}`;
+                        
+                        // Повністю безпечний клік на відкриття через обгортку
                         card.innerHTML = `
-                            <div class="note-content" onclick='openNote(${JSON.stringify(note).replace(/'/g, "\\'")})'>
+                            <div class="note-content">
                                 <div class="note-date">
                                     <span>${dateStr}</span>
                                     <span style="color:var(--primary-color)">📁 ${folderName}</span>
@@ -776,6 +782,9 @@
                                 <button class="action-icon-btn action-delete" onclick="deleteNote(${note.id}, event)" title="Видалити">🗑️</button>
                             </div>
                         `;
+                        // Вішаємо відкриття на клік по контенту
+                        card.querySelector('.note-content').onclick = () => openNote(note);
+                        
                         list.appendChild(card);
                     });
                 };
