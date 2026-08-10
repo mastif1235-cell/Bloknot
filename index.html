@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.26</title>
+    <title>Блокнот - v1.1.27</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -447,7 +447,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.26</b>
+            Версія додатку: <b>v1.1.27</b>
         </div>
     </div>
 
@@ -568,7 +568,8 @@
 
         function initDB() {
             try {
-                const request = window.indexedDB.open("NotepadDB_v2", 1); 
+                // Піднімаємо версію до v3, щоб оновити/створити чисту базу
+                const request = window.indexedDB.open("NotepadDB_v3", 1); 
                 request.onupgradeneeded = function(event) {
                     db = event.target.result;
                     if (!db.objectStoreNames.contains("notes")) {
@@ -785,7 +786,7 @@
                 const transaction = db.transaction(["notes"], "readonly");
                 const store = transaction.objectStore("notes");
                 store.getAll().onsuccess = function(event) {
-                    let notes = event.target.result;
+                    let notes = event.target.result || [];
                     notes = notes.filter(n => n.text && n.text.trim() !== '' && !n.text.includes('function doGet'));
 
                     if (activeFolderFilter !== 'Всі') {
@@ -928,7 +929,7 @@
             const transaction = db.transaction(["trash"], "readonly");
             const store = transaction.objectStore("trash");
             store.getAll().onsuccess = function(event) {
-                const trashItems = event.target.result;
+                const trashItems = event.target.result || [];
                 trashItems.sort((a, b) => b.id - a.id);
                 const list = document.getElementById('trashList');
                 list.innerHTML = '';
