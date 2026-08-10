@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.23</title>
+    <title>Блокнот - v1.1.24</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -447,7 +447,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.23</b>
+            Версія додатку: <b>v1.1.24</b>
         </div>
     </div>
 
@@ -709,7 +709,6 @@
                     notesStore.put(note);
                     trashStore.delete(id);
 
-                    // Відправляємо відновлену нотатку назад у Google Таблицю
                     const scriptUrl = localStorage.getItem('googleScriptUrl');
                     if (scriptUrl) {
                         fetch(scriptUrl, {
@@ -717,7 +716,7 @@
                             mode: "no-cors",
                             headers: { "Content-Type": "text/plain" },
                             body: JSON.stringify({ id: String(note.id), text: note.text, date: note.date, folder: note.folder || DEFAULT_FOLDER })
-                        }).catch(err => console.log("Помилка синхронізації з таблицею при відновленні", err));
+                        }).catch(err => console.log("Помилка синхронізації при відновленні", err));
                     }
                 }
             };
@@ -787,6 +786,9 @@
                 const store = transaction.objectStore("notes");
                 store.getAll().onsuccess = function(event) {
                     let notes = event.target.result;
+                    // Фільтруємо повністю порожні нотатки з прев'ю
+                    notes = notes.filter(n => n.text && n.text.trim() !== '');
+
                     if (activeFolderFilter !== 'Всі') {
                         notes = notes.filter(n => (n.folder || DEFAULT_FOLDER) === activeFolderFilter);
                     }
@@ -805,7 +807,7 @@
                     notes.forEach((note, index) => {
                         const dateStr = note.date || new Date(note.id).toLocaleString('uk-UA');
                         
-                        let rawText = note.text ? note.text : 'Порожня нотатка...';
+                        let rawText = note.text ? note.text : '';
                         let previewText = rawText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, " ");
 
                         const folderName = note.folder || DEFAULT_FOLDER;
@@ -843,7 +845,6 @@
             if (!scriptUrl) { alert("Вкажіть посилання в Налаштуваннях (⚙️)!"); showSettings(); return; }
 
             try {
-                // 1. Отримуємо дані з таблиці
                 const response = await fetch(scriptUrl);
                 const tableData = await response.json();
                 if (!Array.isArray(tableData)) { alert("Некоректні дані з таблиці."); return; }
@@ -851,12 +852,11 @@
                 const transaction = db.transaction(["notes"], "readwrite");
                 const store = transaction.objectStore("notes");
 
-                store.getAll().onsuccess = async function(event) {
-                    const localNotes = event.target.result;
-                    const tableIds = new Set(tableData.map(item => String(item.id)));
+                // Очищаємо локальні нотатки перед синхронізацією, щоб позбутися сміття та завантажити чисті актуальні дані з таблиці
+                store.clear();
 
-                    // Додаємо з таблиці на телефон те, чого там немає
-                    tableData.forEach(item => {
+                tableData.forEach(item => {
+                    if (item.text && item.text.trim() !== '') {
                         let parsedId = Number(item.id) || Date.parse(item.date) || (Date.now() + Math.floor(Math.random() * 1000));
                         store.put({ 
                             id: parsedId, 
@@ -866,29 +866,14 @@
                             isPinned: false,
                             order: parsedId 
                         });
-                    });
-
-                    // Перевіряємо локальні нотатки: якщо якоїсь немає в таблиці — вивантажуємо її туди!
-                    let missingInTable = localNotes.filter(note => !tableIds.has(String(note.id)));
-                    
-                    for (let note of missingInTable) {
-                        try {
-                            await fetch(scriptUrl, {
-                                method: "POST",
-                                mode: "no-cors",
-                                headers: { "Content-Type": "text/plain" },
-                                body: JSON.stringify({ id: String(note.id), text: note.text, date: note.date, folder: note.folder || DEFAULT_FOLDER })
-                            });
-                        } catch (err) {
-                            console.log("Помилка вивантаження відсутнього запису", err);
-                        }
                     }
+                });
 
+                transaction.oncomplete = function() {
                     loadNotesList();
-                    alert("Синхронізація успішна! Всі записи перевірено та об'єднано.");
+                    alert("Синхронізація успішна! Дані оновлено з таблиці.");
                     closeSettings();
                 };
-
             } catch (e) {
                 alert("Помилка синхронізації з таблицею.");
                 console.error(e);
