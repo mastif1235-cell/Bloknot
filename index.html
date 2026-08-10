@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Мої записи - v1.1.8</title>
+    <title>Блокнот</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -40,7 +40,9 @@
             --pinned-bg: #fff5e6;
         }
 
-        * { box-sizing: border-box; }
+        * { 
+            box-sizing: border-box; 
+        }
 
         body {
             background-color: var(--bg-color);
@@ -57,7 +59,11 @@
             height: 100vh; 
             box-sizing: border-box; 
         }
-        .active { display: flex !important; flex-direction: column; }
+        
+        .active { 
+            display: flex !important; 
+            flex-direction: column; 
+        }
 
         .header-row {
             display: flex;
@@ -66,7 +72,11 @@
             margin-bottom: 8px;
         }
 
-        h2 { margin: 0; color: var(--primary-color); font-size: 20px; }
+        h2 { 
+            margin: 0; 
+            color: var(--primary-color); 
+            font-size: 20px; 
+        }
 
         .folders-bar {
             display: flex;
@@ -76,7 +86,10 @@
             margin-bottom: 8px;
             scrollbar-width: none;
         }
-        .folders-bar::-webkit-scrollbar { display: none; }
+        
+        .folders-bar::-webkit-scrollbar { 
+            display: none; 
+        }
         
         .folder-chip {
             background: var(--surface-color);
@@ -88,19 +101,28 @@
             white-space: nowrap;
             cursor: pointer;
         }
+        
         .folder-chip.active-folder {
             background: var(--primary-color);
             color: var(--primary-text);
             border-color: var(--primary-color);
             font-weight: bold;
         }
+        
         .folder-chip-add {
             background: transparent;
             border: 1px dashed var(--text-muted);
             color: var(--text-muted);
         }
 
-        #notesList { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 80px; }
+        #notesList { 
+            flex: 1; 
+            overflow-y: auto; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+            padding-bottom: 80px; 
+        }
         
         .note-card {
             background: var(--surface-color);
@@ -111,6 +133,7 @@
             flex-direction: column;
             overflow: hidden;
         }
+        
         .note-card.pinned {
             background: var(--pinned-bg);
             border-left-color: var(--danger-color);
@@ -120,14 +143,27 @@
             padding: 14px 16px;
             cursor: pointer;
         }
-        .note-date { font-size: 0.78em; color: var(--text-muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
-        .note-preview { font-size: 0.95em; white-space: pre-wrap; word-break: break-word; }
+        
+        .note-date { 
+            font-size: 0.78em; 
+            color: var(--text-muted); 
+            margin-bottom: 6px; 
+            display: flex; 
+            justify-content: space-between; 
+        }
+        
+        .note-preview { 
+            font-size: 0.95em; 
+            white-space: pre-wrap; 
+            word-break: break-word; 
+        }
         
         .note-actions {
             display: flex;
             border-top: 1px solid var(--border-color);
             background: rgba(0,0,0,0.05);
         }
+        
         .action-icon-btn {
             flex: 1;
             background: none;
@@ -141,9 +177,18 @@
             justify-content: center;
             align-items: center;
         }
-        .action-icon-btn:last-child { border-right: none; }
-        .action-icon-btn:active { background: rgba(255, 140, 0, 0.2); }
-        .action-delete { color: var(--danger-color); }
+        
+        .action-icon-btn:last-child { 
+            border-right: none; 
+        }
+        
+        .action-icon-btn:active { 
+            background: rgba(255, 140, 0, 0.2); 
+        }
+        
+        .action-delete { 
+            color: var(--danger-color); 
+        }
 
         #fab {
             position: fixed;
@@ -199,13 +244,36 @@
             width: 100%;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        .btn:active { opacity: 0.8; transform: scale(0.98); }
-        .btn-primary { background: var(--primary-color); color: var(--primary-text); border: none; font-weight: 600; }
-        .btn-recording { background: var(--danger-color); color: #fff; border: none; animation: pulse 1.5s infinite; }
-        .btn-icon-only { width: 44px; height: 44px; padding: 0; flex-shrink: 0; }
-        .btn-danger { color: var(--danger-color); }
         
-        .btn-sync { background: var(--panel-bg); margin-bottom: 12px; }
+        .btn:active { 
+            opacity: 0.8; 
+            transform: scale(0.98); 
+        }
+        
+        .btn-primary { 
+            background: var(--primary-color); 
+            color: var(--primary-text); 
+            border: none; 
+            font-weight: 600; 
+        }
+        
+        .btn-recording { 
+            background: var(--danger-color); 
+            color: #fff; 
+            border: none; 
+            animation: pulse 1.5s infinite; 
+        }
+        
+        .btn-icon-only { 
+            width: 44px; 
+            height: 44px; 
+            padding: 0; 
+            flex-shrink: 0; 
+        }
+        
+        .btn-danger { 
+            color: var(--danger-color); 
+        }
 
         select.btn {
             appearance: none;
@@ -231,8 +299,18 @@
             outline: none;
         }
 
-        .form-group { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
-        .form-group label { font-size: 14px; color: var(--text-muted); }
+        .form-group { 
+            margin-bottom: 16px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 6px; 
+        }
+        
+        .form-group label { 
+            font-size: 14px; 
+            color: var(--text-muted); 
+        }
+        
         .form-group input, .form-group select {
             background: var(--input-bg);
             color: var(--text-color);
@@ -243,7 +321,10 @@
             outline: none;
         }
 
-        .top-actions { display: flex; gap: 8px; }
+        .top-actions { 
+            display: flex; 
+            gap: 8px; 
+        }
 
         @keyframes pulse {
             0% { transform: scale(1); }
@@ -261,7 +342,6 @@
         </div>
         
         <div class="folders-bar" id="foldersBar"></div>
-        <button class="btn btn-sync" onclick="syncFromGoogle()">🔄 Синхронізація та Відновлення з Таблиці</button>
         <div id="notesList"></div>
         <button id="fab" onclick="createNewNote()">+</button>
     </div>
@@ -283,7 +363,7 @@
                 <button class="btn" onclick="shareNote()">📤 Поділитися</button>
             </div>
             <div class="btn-grid">
-                <button class="btn btn-primary" onclick="sendToGoogle()">☁️ В Таблицю</button>
+                <button class="btn btn-primary" onclick="manualSave()">☁️ В Таблицю</button>
                 <button class="btn" id="micBtn" onclick="toggleMic()">🎤 Голос</button>
             </div>
             <div class="btn-grid">
@@ -320,7 +400,7 @@
         <button class="btn btn-primary" style="margin-top: 10px;" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.8</b>
+            Версія додатку: <b>v1.1.10</b>
         </div>
     </div>
 
@@ -467,7 +547,33 @@
         function manualSave() {
             if (!db) { alert("База даних недоступна."); return; }
             autoSave();
-            alert("Нотатку збережено!");
+            
+            const text = document.getElementById('noteEditor').value;
+            const dateStr = document.getElementById('editorDate').innerText;
+            const folder = document.getElementById('noteFolderSelect').value;
+
+            if (!text.trim()) { 
+                alert("Нотатка збережена локально (порожня)."); 
+                return; 
+            }
+
+            const scriptUrl = localStorage.getItem('googleScriptUrl');
+            if (!scriptUrl) {
+                alert("Нотатку збережено локально! (Посилання на таблицю не вказано в налаштуваннях)");
+                return;
+            }
+
+            fetch(scriptUrl, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: text, date: dateStr, folder: folder })
+            }).then(() => {
+                alert("Нотатку збережено та надіслано в таблицю!");
+            }).catch(err => {
+                alert("Збережено локально (помилка мережі при відправці в таблицю).");
+                console.error(err);
+            });
         }
 
         function deleteNote(id, event) {
@@ -662,104 +768,6 @@
                 navigator.share({ title: 'Нотатка', text: text }).catch(console.error);
             } else {
                 alert("Не підтримується на цьому пристрої.");
-            }
-        }
-
-        function sendToGoogle() {
-            const scriptUrl = localStorage.getItem('googleScriptUrl');
-            if (!scriptUrl) {
-                alert("Вкажіть посилання на Google Таблицю в Налаштуваннях (⚙️)!");
-                showSettings();
-                return;
-            }
-
-            const text = document.getElementById('noteEditor').value;
-            const dateStr = document.getElementById('editorDate').innerText;
-            const folder = document.getElementById('noteFolderSelect').value;
-
-            if (!text.trim()) { alert("Нотатка порожня!"); return; }
-
-            const btn = event.target;
-            const originalText = btn.innerText;
-            btn.innerText = "⏳ ...";
-            btn.disabled = true;
-
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = scriptUrl;
-            form.target = 'hidden_iframe';
-
-            const inputData = document.createElement('input');
-            inputData.type = 'hidden';
-            inputData.name = 'data';
-            inputData.value = JSON.stringify({ text: text, date: dateStr, folder: folder });
-            form.appendChild(inputData);
-
-            let iframe = document.getElementById('hidden_iframe');
-            if (!iframe) {
-                iframe = document.createElement('iframe');
-                iframe.name = 'hidden_iframe';
-                iframe.id = 'hidden_iframe';
-                iframe.style.display = 'none';
-                document.body.appendChild(iframe);
-            }
-
-            document.body.appendChild(form);
-            form.submit();
-            document.body.removeChild(form);
-
-            setTimeout(() => {
-                btn.innerText = originalText;
-                btn.disabled = false;
-                alert("Надіслано в таблицю!");
-            }, 1000);
-        }
-
-        async function syncFromGoogle() {
-            if (!db) {
-                alert("База даних недоступна.");
-                return;
-            }
-            const scriptUrl = localStorage.getItem('googleScriptUrl');
-            if (!scriptUrl) {
-                alert("Спочатку вкажіть посилання в Налаштуваннях (⚙️)!");
-                showSettings();
-                return;
-            }
-
-            const btn = event.target;
-            const originalText = btn.innerText;
-            btn.innerText = "⏳ Завантаження...";
-            btn.disabled = true;
-
-            try {
-                const response = await fetch(scriptUrl);
-                const data = await response.json();
-                const transaction = db.transaction(["notes"], "readwrite");
-                const store = transaction.objectStore("notes");
-                
-                store.clear(); // Очищаємо локальну базу перед відновленням з таблиці
-
-                data.forEach(item => {
-                    let parsedId = Date.parse(item.date);
-                    if (isNaN(parsedId)) parsedId = Date.now() + Math.floor(Math.random() * 1000);
-                    store.put({ 
-                        id: parsedId, 
-                        text: item.text, 
-                        date: item.date,
-                        folder: item.folder || DEFAULT_FOLDER,
-                        isPinned: false,
-                        order: parsedId 
-                    });
-                });
-                
-                alert("Дані успішно відновлено та синхронізовано з Google Таблицею!");
-                loadNotesList();
-            } catch (e) {
-                alert("Помилка синхронізації.");
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
             }
         }
     </script>
