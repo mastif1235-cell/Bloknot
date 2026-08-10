@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.22</title>
+    <title>Блокнот - v1.1.23</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -442,12 +442,12 @@
             <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
         </div>
 
-        <button class="btn" style="margin-bottom: 10px;" onclick="syncFromGoogle()">🔄 Відновити з таблиці</button>
+        <button class="btn" style="margin-bottom: 10px;" onclick="syncWithGoogleTable()">🔄 Синхронізувати з таблицею</button>
         <button class="btn" style="margin-bottom: 10px;" onclick="showTrash()">🗑️ Кошик видалених нотаток</button>
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.22</b>
+            Версія додатку: <b>v1.1.23</b>
         </div>
     </div>
 
@@ -708,6 +708,17 @@
                 if (note) {
                     notesStore.put(note);
                     trashStore.delete(id);
+
+                    // Відправляємо відновлену нотатку назад у Google Таблицю
+                    const scriptUrl = localStorage.getItem('googleScriptUrl');
+                    if (scriptUrl) {
+                        fetch(scriptUrl, {
+                            method: "POST",
+                            mode: "no-cors",
+                            headers: { "Content-Type": "text/plain" },
+                            body: JSON.stringify({ id: String(note.id), text: note.text, date: note.date, folder: note.folder || DEFAULT_FOLDER })
+                        }).catch(err => console.log("Помилка синхронізації з таблицею при відновленні", err));
+                    }
                 }
             };
 
@@ -826,39 +837,60 @@
             }
         }
 
-        async function syncFromGoogle() {
+        async function syncWithGoogleTable() {
             if (!db) { alert("База даних ініціалізується, спробуйте за секунду."); return; }
             const scriptUrl = localStorage.getItem('googleScriptUrl');
             if (!scriptUrl) { alert("Вкажіть посилання в Налаштуваннях (⚙️)!"); showSettings(); return; }
 
             try {
+                // 1. Отримуємо дані з таблиці
                 const response = await fetch(scriptUrl);
-                const data = await response.json();
-                if (!Array.isArray(data)) { alert("Некоректні дані з таблиці."); return; }
+                const tableData = await response.json();
+                if (!Array.isArray(tableData)) { alert("Некоректні дані з таблиці."); return; }
 
                 const transaction = db.transaction(["notes"], "readwrite");
                 const store = transaction.objectStore("notes");
-                store.clear();
 
-                data.forEach(item => {
-                    let parsedId = Number(item.id) || Date.parse(item.date) || (Date.now() + Math.floor(Math.random() * 1000));
-                    store.put({ 
-                        id: parsedId, 
-                        text: item.text, 
-                        date: item.date,
-                        folder: item.folder || DEFAULT_FOLDER,
-                        isPinned: false,
-                        order: parsedId 
+                store.getAll().onsuccess = async function(event) {
+                    const localNotes = event.target.result;
+                    const tableIds = new Set(tableData.map(item => String(item.id)));
+
+                    // Додаємо з таблиці на телефон те, чого там немає
+                    tableData.forEach(item => {
+                        let parsedId = Number(item.id) || Date.parse(item.date) || (Date.now() + Math.floor(Math.random() * 1000));
+                        store.put({ 
+                            id: parsedId, 
+                            text: item.text, 
+                            date: item.date,
+                            folder: item.folder || DEFAULT_FOLDER,
+                            isPinned: false,
+                            order: parsedId 
+                        });
                     });
-                });
 
-                transaction.oncomplete = function() {
+                    // Перевіряємо локальні нотатки: якщо якоїсь немає в таблиці — вивантажуємо її туди!
+                    let missingInTable = localNotes.filter(note => !tableIds.has(String(note.id)));
+                    
+                    for (let note of missingInTable) {
+                        try {
+                            await fetch(scriptUrl, {
+                                method: "POST",
+                                mode: "no-cors",
+                                headers: { "Content-Type": "text/plain" },
+                                body: JSON.stringify({ id: String(note.id), text: note.text, date: note.date, folder: note.folder || DEFAULT_FOLDER })
+                            });
+                        } catch (err) {
+                            console.log("Помилка вивантаження відсутнього запису", err);
+                        }
+                    }
+
                     loadNotesList();
-                    alert("Дані успішно відновлено з таблиці!");
+                    alert("Синхронізація успішна! Всі записи перевірено та об'єднано.");
                     closeSettings();
                 };
+
             } catch (e) {
-                alert("Помилка відновлення з таблиці.");
+                alert("Помилка синхронізації з таблицею.");
                 console.error(e);
             }
         }
