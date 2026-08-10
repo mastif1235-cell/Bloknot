@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.14</title>
+    <title>Блокнот - v1.1.15</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -269,7 +269,6 @@
             color: var(--danger-color); 
         }
 
-        /* Стилі для випадаючого меню (3 крапки) */
         .dropdown-content {
             display: none;
             position: absolute;
@@ -380,15 +379,14 @@
                 <button class="btn btn-primary" style="width: auto; padding: 0 16px;" onclick="manualSave()">💾 Зберегти</button>
             </div>
             
-            <!-- Меню 3 крапки -->
             <div style="position: relative;">
                 <button class="btn btn-icon-only" id="menuBtn" onclick="toggleMenu()">⋮</button>
                 <div id="editorMenu" class="dropdown-content">
                     <div class="menu-label">Папка:</div>
-                    <select id="noteFolderSelect" class="btn" onchange="autoSave(); toggleMenu()"></select>
+                    <select id="noteFolderSelect" class="btn" onchange="autoSave()"></select>
                     
                     <div class="menu-label">Мова голосу:</div>
-                    <select id="langSelect" class="btn" onchange="toggleMenu()">
+                    <select id="langSelect" class="btn">
                         <option value="ru-RU">Русский</option>
                         <option value="uk-UA" selected>Українська</option>
                     </select>
@@ -434,7 +432,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.14</b>
+            Версія додатку: <b>v1.1.15</b>
         </div>
     </div>
 
@@ -475,9 +473,9 @@
             initDB();
         };
 
-        // Закриття меню при кліку поза ним
+        // Виправлено: меню не закриватиметься при кліку на його вміст (наприклад, селект)
         window.onclick = function(event) {
-            if (!event.target.matches('#menuBtn')) {
+            if (!event.target.matches('#menuBtn') && !event.target.closest('.dropdown-content')) {
                 var dropdowns = document.getElementsByClassName("dropdown-content");
                 for (var i = 0; i < dropdowns.length; i++) {
                     var openDropdown = dropdowns[i];
@@ -629,17 +627,15 @@
             if (text.trim() !== '') { 
                 const scriptUrl = localStorage.getItem('googleScriptUrl');
                 if (scriptUrl) {
-                    // Відправка в таблицю у фоновому режимі (без зависань екрану)
                     fetch(scriptUrl, {
                         method: "POST",
                         mode: "no-cors",
-                        headers: { "Content-Type": "application/json" },
+                        headers: { "Content-Type": "text/plain" },
                         body: JSON.stringify({ id: currentNoteId, text: text, date: dateStr, folder: folder })
                     }).catch(err => console.log("Офлайн: збережено локально", err));
                 }
             }
             
-            // Миттєво перекидає на головний екран
             goBack();
         }
 
@@ -673,7 +669,7 @@
                         fetch(scriptUrl, {
                             method: "POST",
                             mode: "no-cors",
-                            headers: { "Content-Type": "application/json" },
+                            headers: { "Content-Type": "text/plain" },
                             body: JSON.stringify({ action: "delete", id: id })
                         }).catch(err => console.log("Помилка видалення в таблиці", err));
                     }
