@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Блокнот</title>
+    
+    <!-- Посилання на PWA Маніфест та колір шапки -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff8c00">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3789/3789820.png">
+
     <style>
         /* Цветовые темы */
         :root {
@@ -45,7 +53,6 @@
             transition: background-color 0.3s, color 0.3s;
         }
 
-        /* Видимость экранов */
         #listView, #editorView, #settingsView { 
             display: none; 
             padding: 16px; 
@@ -63,7 +70,6 @@
 
         h2 { margin: 0; color: var(--primary-color); font-size: 20px; }
 
-        /* Папки (Вкладки) */
         .folders-bar {
             display: flex;
             overflow-x: auto;
@@ -96,7 +102,6 @@
             color: var(--text-muted);
         }
 
-        /* Список заметок */
         #notesList { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 80px; }
         
         .note-card {
@@ -120,7 +125,6 @@
         .note-date { font-size: 0.78em; color: var(--text-muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
         .note-preview { font-size: 0.95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         
-        /* Кнопки действий на карточке */
         .note-actions {
             display: flex;
             border-top: 1px solid var(--border-color);
@@ -143,7 +147,6 @@
         .action-icon-btn:active { background: rgba(255, 140, 0, 0.2); }
         .action-delete { color: var(--danger-color); }
 
-        /* Плавающая кнопка + */
         #fab {
             position: fixed;
             bottom: 24px;
@@ -163,7 +166,6 @@
             z-index: 10;
         }
 
-        /* Блок панели управления */
         .control-panel {
             background: var(--panel-bg);
             border: 1px solid var(--border-color);
@@ -254,24 +256,18 @@
 </head>
 <body>
 
-    <!-- ЭКРАН 1: Список заметок -->
     <div id="listView" class="active">
         <div class="header-row">
             <h2>Мої записи</h2>
             <button class="btn btn-icon-only" onclick="showSettings()">⚙️</button>
         </div>
         
-        <!-- Стрічка папок -->
         <div class="folders-bar" id="foldersBar"></div>
-
-        <!-- Кнопка Синхронізації -->
         <button class="btn btn-sync" onclick="syncFromGoogle()">🔄 Синхронізація з Таблицею</button>
-
         <div id="notesList"></div>
         <button id="fab" onclick="createNewNote()">+</button>
     </div>
 
-    <!-- ЭКРАН 2: Редактор -->
     <div id="editorView">
         <div class="header-row">
             <div class="top-actions">
@@ -281,7 +277,6 @@
             <button class="btn btn-icon-only btn-danger" onclick="deleteCurrentNote()">🗑️</button>
         </div>
         
-        <!-- Дата теперь чуть ниже кнопок -->
         <div class="note-date" id="editorDate" style="text-align: right; margin-bottom: 8px;"></div>
 
         <div class="control-panel">
@@ -298,16 +293,13 @@
                     <option value="ru-RU">Русский</option>
                     <option value="uk-UA">Українська</option>
                 </select>
-                <!-- Выбор папки для нотатки -->
-                <select id="noteFolderSelect" class="btn" onchange="autoSave()">
-                </select>
+                <select id="noteFolderSelect" class="btn" onchange="autoSave()"></select>
             </div>
         </div>
 
         <textarea id="noteEditor" placeholder="Почни писати або говорити..." oninput="autoSave()"></textarea>
     </div>
 
-    <!-- ЭКРАН 3: Настройки -->
     <div id="settingsView">
         <div class="header-row">
             <h2>Налаштування</h2>
@@ -336,15 +328,11 @@
         let isRecording = false;
         let recognition;
         
-        // Папки
         const DEFAULT_FOLDER = 'Загальні';
         let customFolders = [];
         let activeFolderFilter = 'Всі';
         let currentNotesArray = []; 
 
-        // ==========================================
-        // 1. ІНІЦІАЛІЗАЦІЯ
-        // ==========================================
         window.onload = function() {
             const savedTheme = localStorage.getItem('appTheme') || 'dark';
             document.body.setAttribute('data-theme', savedTheme);
@@ -368,9 +356,6 @@
             localStorage.setItem('appTheme', theme);
         }
 
-        // ==========================================
-        // ПАПКИ
-        // ==========================================
         function renderFoldersBar() {
             const bar = document.getElementById('foldersBar');
             bar.innerHTML = '';
@@ -419,9 +404,6 @@
             });
         }
 
-        // ==========================================
-        // РОБОТА З БД
-        // ==========================================
         function initDB() {
             try {
                 const request = window.indexedDB.open("NotepadDB", 4); 
@@ -472,7 +454,7 @@
 
         function autoSave() {
             if (!currentNoteId) return;
-            if (!db) return; // Якщо БД немає (локальний режим), мовчки ігноруємо автозбереження
+            if (!db) return;
             
             try {
                 const text = document.getElementById('noteEditor').value;
@@ -500,21 +482,18 @@
 
         function manualSave() {
             if (window.location.protocol === 'content:' || window.location.protocol === 'file:') {
-                alert("Збереження неможливе! Ви відкрили файл у режимі попереднього перегляду, система блокує базу даних. Завантажте файл на GitHub.");
+                alert("Збереження неможливе у режимі попереднього перегляду! Відкрийте додаток через завантажений GitHub сайт.");
                 return;
             }
             if (!db) {
-                alert("Помилка бази даних. Збереження не вдалося.");
+                alert("Помилка бази даних.");
                 return;
             }
             
             autoSave();
-            alert("Нотатку успішно збережено!");
+            alert("Нотатку збережено!");
         }
 
-        // ==========================================
-        // ДІЇ З КАРТКАМИ
-        // ==========================================
         function deleteNote(id, event) {
             if(event) event.stopPropagation(); 
             if (!db) { alert("База даних недоступна."); return; }
@@ -567,9 +546,6 @@
             store.put(note2).onsuccess = loadNotesList;
         }
 
-        // ==========================================
-        // ЗАВАНТАЖЕННЯ СПИСКУ
-        // ==========================================
         function loadNotesList() {
             if (!db) return;
             try {
@@ -636,9 +612,6 @@
             }
         }
 
-        // ==========================================
-        // НАВІГАЦІЯ ТА ІНШЕ
-        // ==========================================
         function showEditor() {
             document.getElementById('listView').classList.remove('active');
             document.getElementById('settingsView').classList.remove('active');
@@ -647,7 +620,6 @@
 
         function goBack() {
             if (isRecording) toggleMic();
-            // Намагаємось зберегти перед виходом
             autoSave();
             currentNoteId = null;
             document.getElementById('editorView').classList.remove('active');
@@ -677,9 +649,6 @@
             closeSettings();
         }
 
-        // ==========================================
-        // ГОЛОСОВИЙ ВВІД
-        // ==========================================
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
@@ -711,9 +680,8 @@
         }
 
         function toggleMic() {
-            // Перевірка на локальний запуск
             if (window.location.protocol === 'content:' || window.location.protocol === 'file:') {
-                alert("Голосовий ввід ЗАБЛОКОВАНО! Ваш телефон не дозволяє використовувати мікрофон при відкритті файлу безпосередньо з пам'яті. Завантажте файл на GitHub (потрібне з'єднання https://).");
+                alert("Голосовий ввід ЗАБЛОКОВАНО! Відкрийте сайт через розгорнуту сторінку GitHub Pages (з з'єднанням https://).");
                 return;
             }
 
@@ -737,9 +705,6 @@
             }
         }
 
-        // ==========================================
-        // ЕКСПОРТ
-        // ==========================================
         function copyCurrentNote() {
             const text = document.getElementById('noteEditor').value;
             if (!text.trim()) { alert("Нотатка порожня!"); return; }
@@ -756,9 +721,6 @@
             }
         }
 
-        // ==========================================
-        // GOOGLE ТАБЛИЦІ
-        // ==========================================
         function sendToGoogle() {
             const scriptUrl = localStorage.getItem('googleScriptUrl');
             if (!scriptUrl) {
@@ -795,7 +757,7 @@
 
         async function syncFromGoogle() {
             if (!db) {
-                alert("База даних недоступна. Відкрийте через звичайний браузер (GitHub).");
+                alert("База даних недоступна. Відкрийте через розгорнутий сайт GitHub.");
                 return;
             }
 
