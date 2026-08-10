@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Блокнот</title>
+    <style>
+        /* Цветовые темы */
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --panel-bg: #262626;
+            --border-color: #383838;
+            --text-color: #ffffff;
+            --text-muted: #aaaaaa;
+            --primary-color: #ff8c00;
+            --primary-text: #000000;
+            --danger-color: #ff3b30;
+            --input-bg: #121212;
+            --pinned-bg: #332200;
+        }
+
+        [data-theme="light"] {
+            --bg-color: #f4f5f8;
+            --surface-color: #ffffff;
+            --panel-bg: #e9ecef;
+            --border-color: #d1d5db;
+            --text-color: #111827;
+            --text-muted: #6b7280;
+            --primary-color: #ff8c00;
+            --primary-text: #ffffff;
+            --danger-color: #dc2626;
+            --input-bg: #ffffff;
+            --pinned-bg: #fff5e6;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Видимость экранов */
+        #listView, #editorView, #settingsView { 
+            display: none; 
+            padding: 16px; 
+            height: 100vh; 
+            box-sizing: border-box; 
+        }
+        .active { display: flex !important; flex-direction: column; }
+
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        h2 { margin: 0; color: var(--primary-color); font-size: 20px; }
+
+        /* Папки (Вкладки) */
+        .folders-bar {
+            display: flex;
+            overflow-x: auto;
+            gap: 8px;
+            padding-bottom: 12px;
+            margin-bottom: 8px;
+            scrollbar-width: none;
+        }
+        .folders-bar::-webkit-scrollbar { display: none; }
+        
+        .folder-chip {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .folder-chip.active-folder {
+            background: var(--primary-color);
+            color: var(--primary-text);
+            border-color: var(--primary-color);
+            font-weight: bold;
+        }
+        .folder-chip-add {
+            background: transparent;
+            border: 1px dashed var(--text-muted);
+            color: var(--text-muted);
+        }
+
+        /* Список заметок */
+        #notesList { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 80px; }
+        
+        .note-card {
+            background: var(--surface-color);
+            border-radius: 12px;
+            border-left: 4px solid var(--primary-color);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .note-card.pinned {
+            background: var(--pinned-bg);
+            border-left-color: var(--danger-color);
+        }
+        
+        .note-content {
+            padding: 14px 16px;
+            cursor: pointer;
+        }
+        .note-date { font-size: 0.78em; color: var(--text-muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .note-preview { font-size: 0.95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        /* Кнопки действий на карточке */
+        .note-actions {
+            display: flex;
+            border-top: 1px solid var(--border-color);
+            background: rgba(0,0,0,0.05);
+        }
+        .action-icon-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            border-right: 1px solid var(--border-color);
+            padding: 10px 0;
+            color: var(--text-color);
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .action-icon-btn:last-child { border-right: none; }
+        .action-icon-btn:active { background: rgba(255, 140, 0, 0.2); }
+        .action-delete { color: var(--danger-color); }
+
+        /* Плавающая кнопка + */
+        #fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 58px;
+            height: 58px;
+            border-radius: 29px;
+            background-color: var(--primary-color);
+            color: #fff;
+            font-size: 32px;
+            border: none;
+            box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        /* Блок панели управления */
+        .control-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 10px;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn {
+            height: 44px;
+            background: var(--surface-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 13.5px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 0 8px;
+            width: 100%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .btn:active { opacity: 0.8; transform: scale(0.98); }
+        .btn-primary { background: var(--primary-color); color: var(--primary-text); border: none; font-weight: 600; }
+        .btn-recording { background: var(--danger-color); color: #fff; border: none; animation: pulse 1.5s infinite; }
+        .btn-icon-only { width: 44px; height: 44px; padding: 0; flex-shrink: 0; }
+        .btn-danger { color: var(--danger-color); }
+        
+        .btn-sync { background: var(--panel-bg); margin-bottom: 12px; }
+
+        select.btn {
+            appearance: none;
+            text-align-last: center;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 14px;
+            padding-right: 24px;
+        }
+
+        textarea {
+            flex: 1;
+            width: 100%;
+            background: var(--surface-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 16px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+        }
+
+        .form-group { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 14px; color: var(--text-muted); }
+        .form-group input, .form-group select {
+            background: var(--input-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .top-actions { display: flex; gap: 8px; }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); box-shadow: 0 0 10px var(--danger-color); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ЭКРАН 1: Список заметок -->
+    <div id="listView" class="active">
+        <div class="header-row">
+            <h2>Мої записи</h2>
+            <button class="btn btn-icon-only" onclick="showSettings()">⚙️</button>
+        </div>
+        
+        <!-- Стрічка папок -->
+        <div class="folders-bar" id="foldersBar"></div>
+
+        <!-- Кнопка Синхронізації -->
+        <button class="btn btn-sync" onclick="syncFromGoogle()">🔄 Синхронізація з Таблицею</button>
+
+        <div id="notesList"></div>
+        <button id="fab" onclick="createNewNote()">+</button>
+    </div>
+
+    <!-- ЭКРАН 2: Редактор -->
+    <div id="editorView">
+        <div class="header-row">
+            <div class="top-actions">
+                <button class="btn" style="width: auto; padding: 0 16px;" onclick="goBack()">🔙 Назад</button>
+                <button class="btn btn-primary" style="width: auto; padding: 0 16px;" onclick="manualSave()">💾 Зберегти</button>
+            </div>
+            <button class="btn btn-icon-only btn-danger" onclick="deleteCurrentNote()">🗑️</button>
+        </div>
+        
+        <!-- Дата теперь чуть ниже кнопок -->
+        <div class="note-date" id="editorDate" style="text-align: right; margin-bottom: 8px;"></div>
+
+        <div class="control-panel">
+            <div class="btn-grid">
+                <button class="btn" onclick="copyCurrentNote()">📋 Копіювати</button>
+                <button class="btn" onclick="shareNote()">📤 Поділитися</button>
+            </div>
+            <div class="btn-grid">
+                <button class="btn btn-primary" onclick="sendToGoogle()">☁️ В Таблицю</button>
+                <button class="btn" id="micBtn" onclick="toggleMic()">🎤 Голос</button>
+            </div>
+            <div class="btn-grid">
+                <select id="langSelect" class="btn">
+                    <option value="ru-RU">Русский</option>
+                    <option value="uk-UA">Українська</option>
+                </select>
+                <!-- Выбор папки для нотатки -->
+                <select id="noteFolderSelect" class="btn" onchange="autoSave()">
+                </select>
+            </div>
+        </div>
+
+        <textarea id="noteEditor" placeholder="Почни писати або говорити..." oninput="autoSave()"></textarea>
+    </div>
+
+    <!-- ЭКРАН 3: Настройки -->
+    <div id="settingsView">
+        <div class="header-row">
+            <h2>Налаштування</h2>
+            <button class="btn" style="width: auto; padding: 0 16px;" onclick="closeSettings()">Закрити</button>
+        </div>
+        
+        <div class="form-group" style="margin-top: 10px;">
+            <label>Тема оформлення:</label>
+            <select id="themeSelect" onchange="changeTheme(this.value)">
+                <option value="dark">Темна</option>
+                <option value="light">Світла</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Посилання Google Apps Script (Web App URL):</label>
+            <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+        </div>
+
+        <button class="btn btn-primary" style="margin-top: 10px;" onclick="saveSettings()">Зберегти налаштування</button>
+    </div>
+
+    <script>
+        let db = null;
+        let currentNoteId = null;
+        let isRecording = false;
+        let recognition;
+        
+        // Папки
+        const DEFAULT_FOLDER = 'Загальні';
+        let customFolders = [];
+        let activeFolderFilter = 'Всі';
+        let currentNotesArray = []; 
+
+        // ==========================================
+        // 1. ІНІЦІАЛІЗАЦІЯ
+        // ==========================================
+        window.onload = function() {
+            const savedTheme = localStorage.getItem('appTheme') || 'dark';
+            document.body.setAttribute('data-theme', savedTheme);
+            document.getElementById('themeSelect').value = savedTheme;
+
+            const savedUrl = localStorage.getItem('googleScriptUrl') || '';
+            document.getElementById('scriptUrlInput').value = savedUrl;
+
+            const savedFolders = localStorage.getItem('appFolders');
+            if (savedFolders) {
+                customFolders = JSON.parse(savedFolders);
+            }
+            renderFoldersBar();
+            updateFolderSelects();
+
+            initDB();
+        };
+
+        function changeTheme(theme) {
+            document.body.setAttribute('data-theme', theme);
+            localStorage.setItem('appTheme', theme);
+        }
+
+        // ==========================================
+        // ПАПКИ
+        // ==========================================
+        function renderFoldersBar() {
+            const bar = document.getElementById('foldersBar');
+            bar.innerHTML = '';
+
+            bar.appendChild(createFolderChip('Всі', activeFolderFilter === 'Всі'));
+            bar.appendChild(createFolderChip(DEFAULT_FOLDER, activeFolderFilter === DEFAULT_FOLDER));
+
+            customFolders.forEach(folder => {
+                bar.appendChild(createFolderChip(folder, activeFolderFilter === folder));
+            });
+
+            const addBtn = document.createElement('button');
+            addBtn.className = 'folder-chip folder-chip-add';
+            addBtn.innerText = '+ Папка';
+            addBtn.onclick = addFolder;
+            bar.appendChild(addBtn);
+        }
+
+        function createFolderChip(name, isActive) {
+            const btn = document.createElement('button');
+            btn.className = `folder-chip ${isActive ? 'active-folder' : ''}`;
+            btn.innerText = name;
+            btn.onclick = () => {
+                activeFolderFilter = name;
+                renderFoldersBar();
+                loadNotesList();
+            };
+            return btn;
+        }
+
+        function addFolder() {
+            const name = prompt("Введіть назву нової папки:");
+            if (name && name.trim() !== '' && name !== 'Всі' && name !== DEFAULT_FOLDER && !customFolders.includes(name)) {
+                customFolders.push(name.trim());
+                localStorage.setItem('appFolders', JSON.stringify(customFolders));
+                renderFoldersBar();
+                updateFolderSelects();
+            }
+        }
+
+        function updateFolderSelects() {
+            const select = document.getElementById('noteFolderSelect');
+            select.innerHTML = `<option value="${DEFAULT_FOLDER}">${DEFAULT_FOLDER}</option>`;
+            customFolders.forEach(f => {
+                select.innerHTML += `<option value="${f}">${f}</option>`;
+            });
+        }
+
+        // ==========================================
+        // РОБОТА З БД
+        // ==========================================
+        function initDB() {
+            try {
+                const request = window.indexedDB.open("NotepadDB", 4); 
+                
+                request.onupgradeneeded = function(event) {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains("notes")) {
+                        db.createObjectStore("notes", { keyPath: "id" });
+                    }
+                };
+
+                request.onsuccess = function(event) {
+                    db = event.target.result;
+                    loadNotesList();
+                };
+                
+                request.onerror = function(event) {
+                    console.warn("БД недоступна:", event);
+                };
+            } catch (e) {
+                console.warn("IndexedDB не підтримується", e);
+            }
+        }
+
+        function createNewNote() {
+            try {
+                currentNoteId = Date.now();
+                document.getElementById('noteEditor').value = '';
+                document.getElementById('editorDate').innerText = new Date(currentNoteId).toLocaleString('uk-UA');
+                
+                const folderToSet = (activeFolderFilter !== 'Всі') ? activeFolderFilter : DEFAULT_FOLDER;
+                document.getElementById('noteFolderSelect').value = folderToSet;
+
+                showEditor();
+                autoSave();
+            } catch (error) {
+                console.error("Помилка:", error);
+            }
+        }
+
+        function openNote(note) {
+            currentNoteId = note.id;
+            document.getElementById('noteEditor').value = note.text || '';
+            document.getElementById('editorDate').innerText = new Date(note.date).toLocaleString('uk-UA');
+            document.getElementById('noteFolderSelect').value = note.folder || DEFAULT_FOLDER;
+            showEditor();
+        }
+
+        function autoSave() {
+            if (!currentNoteId) return;
+            if (!db) return; // Якщо БД немає (локальний режим), мовчки ігноруємо автозбереження
+            
+            try {
+                const text = document.getElementById('noteEditor').value;
+                const folder = document.getElementById('noteFolderSelect').value;
+                
+                const transaction = db.transaction(["notes"], "readwrite");
+                const store = transaction.objectStore("notes");
+                const getReq = store.get(currentNoteId);
+
+                getReq.onsuccess = function() {
+                    let note = getReq.result || {};
+                    note.id = currentNoteId;
+                    note.text = text;
+                    note.date = note.date || new Date().toISOString(); 
+                    note.folder = folder;
+                    note.isPinned = note.isPinned || false;
+                    note.order = note.order || currentNoteId; 
+
+                    store.put(note);
+                };
+            } catch (e) {
+                console.warn("Не вдалося зберегти в БД", e);
+            }
+        }
+
+        function manualSave() {
+            if (window.location.protocol === 'content:' || window.location.protocol === 'file:') {
+                alert("Збереження неможливе! Ви відкрили файл у режимі попереднього перегляду, система блокує базу даних. Завантажте файл на GitHub.");
+                return;
+            }
+            if (!db) {
+                alert("Помилка бази даних. Збереження не вдалося.");
+                return;
+            }
+            
+            autoSave();
+            alert("Нотатку успішно збережено!");
+        }
+
+        // ==========================================
+        // ДІЇ З КАРТКАМИ
+        // ==========================================
+        function deleteNote(id, event) {
+            if(event) event.stopPropagation(); 
+            if (!db) { alert("База даних недоступна."); return; }
+            if (confirm("Точно видалити цей запис?")) {
+                db.transaction(["notes"], "readwrite").objectStore("notes").delete(id);
+                loadNotesList();
+            }
+        }
+
+        function deleteCurrentNote() {
+            if (currentNoteId && confirm("Точно видалити цей запис?")) {
+                if (db) {
+                    db.transaction(["notes"], "readwrite").objectStore("notes").delete(currentNoteId);
+                }
+                goBack();
+            }
+        }
+
+        function togglePin(id, event) {
+            if(event) event.stopPropagation();
+            if(!db) return;
+            
+            const store = db.transaction(["notes"], "readwrite").objectStore("notes");
+            store.get(id).onsuccess = function(e) {
+                let note = e.target.result;
+                note.isPinned = !note.isPinned;
+                store.put(note).onsuccess = loadNotesList;
+            };
+        }
+
+        function moveNote(index, direction, event) {
+            if(event) event.stopPropagation();
+            if(!db) return;
+            
+            if (direction === 'up' && index === 0) return;
+            if (direction === 'down' && index === currentNotesArray.length - 1) return;
+
+            const targetIndex = direction === 'up' ? index - 1 : index + 1;
+            const note1 = currentNotesArray[index];
+            const note2 = currentNotesArray[targetIndex];
+
+            if (note1.isPinned !== note2.isPinned) return;
+
+            const tempOrder = note1.order;
+            note1.order = note2.order;
+            note2.order = tempOrder;
+
+            const store = db.transaction(["notes"], "readwrite").objectStore("notes");
+            store.put(note1);
+            store.put(note2).onsuccess = loadNotesList;
+        }
+
+        // ==========================================
+        // ЗАВАНТАЖЕННЯ СПИСКУ
+        // ==========================================
+        function loadNotesList() {
+            if (!db) return;
+            try {
+                const transaction = db.transaction(["notes"], "readonly");
+                const store = transaction.objectStore("notes");
+                const request = store.getAll();
+
+                request.onsuccess = function(event) {
+                    let notes = event.target.result;
+                    
+                    if (activeFolderFilter !== 'Всі') {
+                        notes = notes.filter(n => (n.folder || DEFAULT_FOLDER) === activeFolderFilter);
+                    }
+
+                    notes.sort((a, b) => {
+                        if (a.isPinned && !b.isPinned) return -1;
+                        if (!a.isPinned && b.isPinned) return 1;
+                        const orderA = a.order || a.id;
+                        const orderB = b.order || b.id;
+                        return orderB - orderA; 
+                    });
+
+                    currentNotesArray = notes; 
+                    const list = document.getElementById('notesList');
+                    list.innerHTML = '';
+                    
+                    if (notes.length === 0) {
+                        list.innerHTML = `<div style="text-align:center; color:var(--text-muted); margin-top:20px;">Немає записів</div>`;
+                        return;
+                    }
+
+                    notes.forEach((note, index) => {
+                        let displayDate = typeof note.date === 'number' ? new Date(note.date) : new Date(note.date);
+                        if (isNaN(displayDate)) displayDate = new Date();
+                        
+                        const dateStr = displayDate.toLocaleString('uk-UA');
+                        const previewText = note.text ? note.text.substring(0, 70) + '...' : 'Порожня нотатка...';
+                        const folderName = note.folder || DEFAULT_FOLDER;
+                        const pinIcon = note.isPinned ? '📍' : '📌';
+
+                        const card = document.createElement('div');
+                        card.className = `note-card ${note.isPinned ? 'pinned' : ''}`;
+                        
+                        card.innerHTML = `
+                            <div class="note-content" onclick='openNote(${JSON.stringify(note).replace(/'/g, "\\'")})'>
+                                <div class="note-date">
+                                    <span>${dateStr}</span>
+                                    <span style="color:var(--primary-color)">📁 ${folderName}</span>
+                                </div>
+                                <div class="note-preview">${previewText}</div>
+                            </div>
+                            <div class="note-actions">
+                                <button class="action-icon-btn" onclick="togglePin(${note.id}, event)" title="Закріпити">${pinIcon}</button>
+                                <button class="action-icon-btn" onclick="moveNote(${index}, 'up', event)" title="Вгору">⬆️</button>
+                                <button class="action-icon-btn" onclick="moveNote(${index}, 'down', event)" title="Вниз">⬇️</button>
+                                <button class="action-icon-btn action-delete" onclick="deleteNote(${note.id}, event)" title="Видалити">🗑️</button>
+                            </div>
+                        `;
+                        list.appendChild(card);
+                    });
+                };
+            } catch (e) {
+                console.warn("Помилка списку", e);
+            }
+        }
+
+        // ==========================================
+        // НАВІГАЦІЯ ТА ІНШЕ
+        // ==========================================
+        function showEditor() {
+            document.getElementById('listView').classList.remove('active');
+            document.getElementById('settingsView').classList.remove('active');
+            document.getElementById('editorView').classList.add('active');
+        }
+
+        function goBack() {
+            if (isRecording) toggleMic();
+            // Намагаємось зберегти перед виходом
+            autoSave();
+            currentNoteId = null;
+            document.getElementById('editorView').classList.remove('active');
+            document.getElementById('listView').classList.add('active');
+            loadNotesList();
+        }
+
+        function showSettings() {
+            document.getElementById('listView').classList.remove('active');
+            document.getElementById('editorView').classList.remove('active');
+            document.getElementById('settingsView').classList.add('active');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsView').classList.remove('active');
+            if (currentNoteId) {
+                document.getElementById('editorView').classList.add('active');
+            } else {
+                document.getElementById('listView').classList.add('active');
+            }
+        }
+
+        function saveSettings() {
+            const url = document.getElementById('scriptUrlInput').value.trim();
+            localStorage.setItem('googleScriptUrl', url);
+            alert("Налаштування збережено!");
+            closeSettings();
+        }
+
+        // ==========================================
+        // ГОЛОСОВИЙ ВВІД
+        // ==========================================
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onresult = function(event) {
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript + ' ';
+                    }
+                }
+                if (finalTranscript) {
+                    const editor = document.getElementById('noteEditor');
+                    editor.value = editor.value + (editor.value.endsWith(' ') || editor.value === '' ? '' : ' ') + finalTranscript;
+                    autoSave();
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.error("Голосова помилка: ", event.error);
+                if (isRecording) toggleMic();
+            };
+            
+            recognition.onend = function() {
+                if (isRecording) recognition.start();
+            };
+        }
+
+        function toggleMic() {
+            // Перевірка на локальний запуск
+            if (window.location.protocol === 'content:' || window.location.protocol === 'file:') {
+                alert("Голосовий ввід ЗАБЛОКОВАНО! Ваш телефон не дозволяє використовувати мікрофон при відкритті файлу безпосередньо з пам'яті. Завантажте файл на GitHub (потрібне з'єднання https://).");
+                return;
+            }
+
+            if (!recognition) {
+                alert("Ваш браузер не підтримує голосовий ввід.");
+                return;
+            }
+
+            const btn = document.getElementById('micBtn');
+            if (isRecording) {
+                recognition.stop();
+                btn.classList.remove('btn-recording');
+                btn.innerText = "🎤 Голос";
+                isRecording = false;
+            } else {
+                recognition.lang = document.getElementById('langSelect').value;
+                recognition.start();
+                btn.classList.add('btn-recording');
+                btn.innerText = "🛑 Стоп";
+                isRecording = true;
+            }
+        }
+
+        // ==========================================
+        // ЕКСПОРТ
+        // ==========================================
+        function copyCurrentNote() {
+            const text = document.getElementById('noteEditor').value;
+            if (!text.trim()) { alert("Нотатка порожня!"); return; }
+            navigator.clipboard.writeText(text).then(() => alert("Скопійовано!")).catch(err => alert("Помилка: " + err));
+        }
+
+        function shareNote() {
+            const text = document.getElementById('noteEditor').value;
+            if (!text.trim()) { alert("Нотатка порожня!"); return; }
+            if (navigator.share) {
+                navigator.share({ title: 'Нотатка', text: text }).catch(console.error);
+            } else {
+                alert("Не підтримується на цьому пристрої.");
+            }
+        }
+
+        // ==========================================
+        // GOOGLE ТАБЛИЦІ
+        // ==========================================
+        function sendToGoogle() {
+            const scriptUrl = localStorage.getItem('googleScriptUrl');
+            if (!scriptUrl) {
+                alert("Вкажіть посилання на Google Таблицю в Налаштуваннях (⚙️)!");
+                showSettings();
+                return;
+            }
+
+            const text = document.getElementById('noteEditor').value;
+            const dateStr = document.getElementById('editorDate').innerText;
+
+            if (!text.trim()) { alert("Нотатка порожня!"); return; }
+
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ ...";
+            btn.disabled = true;
+
+            fetch(scriptUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text, date: dateStr })
+            }).then(() => {
+                alert("Надіслано в таблицю!");
+            }).catch(error => {
+                console.error("Помилка:", error);
+                alert("Помилка при відправці.");
+            }).finally(() => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        async function syncFromGoogle() {
+            if (!db) {
+                alert("База даних недоступна. Відкрийте через звичайний браузер (GitHub).");
+                return;
+            }
+
+            const scriptUrl = localStorage.getItem('googleScriptUrl');
+            if (!scriptUrl) {
+                alert("Спочатку вкажіть посилання на Google Таблицю в Налаштуваннях (⚙️)!");
+                showSettings();
+                return;
+            }
+
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ Завантаження...";
+            btn.disabled = true;
+
+            try {
+                const response = await fetch(scriptUrl);
+                const data = await response.json();
+                
+                const transaction = db.transaction(["notes"], "readwrite");
+                const store = transaction.objectStore("notes");
+                
+                data.forEach(item => {
+                    let parsedId = Date.parse(item.date);
+                    if (isNaN(parsedId)) parsedId = Date.now() + Math.floor(Math.random() * 1000);
+                    
+                    store.put({ 
+                        id: parsedId, 
+                        text: item.text, 
+                        date: item.date,
+                        folder: DEFAULT_FOLDER,
+                        isPinned: false,
+                        order: parsedId 
+                    });
+                });
+                
+                alert("Дані успішно синхронізовані!");
+                loadNotesList();
+            } catch (e) {
+                alert("Помилка синхронізації. Перевірте посилання.");
+                console.error(e);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
