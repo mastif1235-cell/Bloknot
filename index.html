@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#ff8c00">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3789/3789820.png">
+    <link rel="apple-touch-icon" href="icon.png">
 
     <style>
         :root {
@@ -318,6 +318,11 @@
         </div>
 
         <button class="btn btn-primary" style="margin-top: 10px;" onclick="saveSettings()">Зберегти налаштування</button>
+        
+        <!-- Версия приложения -->
+        <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
+            Версія додатку: <b>v1.1</b>
+        </div>
     </div>
 
     <script>
@@ -650,12 +655,10 @@
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
-            // ВАЖНО: Отключаем баг Android с дублированием
             recognition.continuous = false;
             recognition.interimResults = false;
 
             recognition.onresult = function(event) {
-                // Берем только самый свежий результат
                 const finalTranscript = event.results[0][0].transcript;
                 if (finalTranscript) {
                     const editor = document.getElementById('noteEditor');
@@ -673,7 +676,6 @@
             };
             
             recognition.onend = function() {
-                // Автоматически перезапускаем микрофон, если запись не была остановлена кнопкой
                 if (isRecording) {
                     recognition.start();
                 }
@@ -738,7 +740,6 @@
             fetch(scriptUrl, {
                 method: 'POST',
                 mode: 'no-cors',
-                // ВАЖНО: Изменен заголовок, чтобы Google Script без ошибок съедал JSON
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ text: text, date: dateStr })
             }).then(() => {
