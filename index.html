@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.15</title>
+    <title>Блокнот - v1.1.16</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -432,7 +432,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.15</b>
+            Версія додатку: <b>v1.1.16</b>
         </div>
     </div>
 
@@ -473,7 +473,6 @@
             initDB();
         };
 
-        // Виправлено: меню не закриватиметься при кліку на його вміст (наприклад, селект)
         window.onclick = function(event) {
             if (!event.target.matches('#menuBtn') && !event.target.closest('.dropdown-content')) {
                 var dropdowns = document.getElementsByClassName("dropdown-content");
@@ -631,7 +630,7 @@
                         method: "POST",
                         mode: "no-cors",
                         headers: { "Content-Type": "text/plain" },
-                        body: JSON.stringify({ id: currentNoteId, text: text, date: dateStr, folder: folder })
+                        body: JSON.stringify({ id: String(currentNoteId), text: text, date: dateStr, folder: folder })
                     }).catch(err => console.log("Офлайн: збережено локально", err));
                 }
             }
@@ -643,6 +642,18 @@
             if(event) event.stopPropagation(); 
             if (!confirm("Точно видалити цей запис?")) return;
 
+            // 1. Відразу жменмо запит на видалення в таблицю, щоб не чекати локальну базу
+            const scriptUrl = localStorage.getItem('googleScriptUrl');
+            if (scriptUrl) {
+                fetch(scriptUrl, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "text/plain" },
+                    body: JSON.stringify({ action: "delete", id: String(id) })
+                }).catch(err => console.log("Помилка видалення в таблиці", err));
+            }
+
+            // 2. Тепер видаляємо з локальної бази і кидаємо в кошик
             if (!db) return;
             const tx = db.transaction(["notes", "trash"], "readwrite");
             const notesStore = tx.objectStore("notes");
@@ -663,16 +674,6 @@
                             }
                         }
                     };
-
-                    const scriptUrl = localStorage.getItem('googleScriptUrl');
-                    if (scriptUrl) {
-                        fetch(scriptUrl, {
-                            method: "POST",
-                            mode: "no-cors",
-                            headers: { "Content-Type": "text/plain" },
-                            body: JSON.stringify({ action: "delete", id: id })
-                        }).catch(err => console.log("Помилка видалення в таблиці", err));
-                    }
                 }
             };
 
@@ -683,7 +684,10 @@
 
         function deleteCurrentNote() {
             if (currentNoteId) {
-                deleteNote(currentNoteId);
+                const idToDelete = currentNoteId;
+                // Блокуємо автозбереження, щоб воно не воскресило запис після видалення
+                currentNoteId = null; 
+                deleteNote(idToDelete);
                 goBack();
             }
         }
