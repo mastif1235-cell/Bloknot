@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.21</title>
+    <title>Блокнот - v1.1.22</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -22,6 +22,7 @@
             --primary-color: #ff8c00;
             --primary-text: #000000;
             --danger-color: #ff3b30;
+            --success-color: #34c759;
             --input-bg: #121212;
             --pinned-bg: #332200;
         }
@@ -36,6 +37,7 @@
             --primary-color: #ff8c00;
             --primary-text: #ffffff;
             --danger-color: #dc2626;
+            --success-color: #16a34a;
             --input-bg: #ffffff;
             --pinned-bg: #fff5e6;
         }
@@ -131,7 +133,6 @@
             flex-direction: column;
             flex-shrink: 0;
             overflow: hidden;
-            /* Суворий захист висоти картки на головному екрані */
             height: 95px;
             max-height: 95px;
         }
@@ -156,7 +157,6 @@
             justify-content: space-between; 
         }
         
-        /* Залізно суворо в один рядок з трикрапкою */
         .note-preview { 
             font-size: 0.9em; 
             white-space: nowrap; 
@@ -197,6 +197,10 @@
         
         .action-delete { 
             color: var(--danger-color); 
+        }
+
+        .action-restore {
+            color: var(--success-color);
         }
 
         #fab {
@@ -443,7 +447,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.21</b>
+            Версія додатку: <b>v1.1.22</b>
         </div>
     </div>
 
@@ -691,6 +695,39 @@
             };
         }
 
+        function restoreNoteFromTrash(id, event) {
+            if(event) event.stopPropagation();
+            if(!db) return;
+
+            const tx = db.transaction(["notes", "trash"], "readwrite");
+            const notesStore = tx.objectStore("notes");
+            const trashStore = tx.objectStore("trash");
+
+            trashStore.get(id).onsuccess = function(e) {
+                const note = e.target.result;
+                if (note) {
+                    notesStore.put(note);
+                    trashStore.delete(id);
+                }
+            };
+
+            tx.oncomplete = function() {
+                loadTrashList();
+            };
+        }
+
+        function permanentDeleteFromTrash(id, event) {
+            if(event) event.stopPropagation();
+            if(!confirm("Остаточно видалити запис з кошика?")) return;
+            if(!db) return;
+
+            const tx = db.transaction(["trash"], "readwrite");
+            tx.objectStore("trash").delete(id);
+            tx.oncomplete = function() {
+                loadTrashList();
+            };
+        }
+
         function deleteCurrentNote() {
             if (currentNoteId) {
                 const idToDelete = currentNoteId;
@@ -765,8 +802,6 @@
 
                         const card = document.createElement('div');
                         card.className = `note-card ${note.isPinned ? 'pinned' : ''}`;
-                        
-                        // Повністю безпечний клік на відкриття через обгортку
                         card.innerHTML = `
                             <div class="note-content">
                                 <div class="note-date">
@@ -782,9 +817,7 @@
                                 <button class="action-icon-btn action-delete" onclick="deleteNote(${note.id}, event)" title="Видалити">🗑️</button>
                             </div>
                         `;
-                        // Вішаємо відкриття на клік по контенту
                         card.querySelector('.note-content').onclick = () => openNote(note);
-                        
                         list.appendChild(card);
                     });
                 };
@@ -888,12 +921,16 @@
                     card.className = 'note-card';
                     
                     let rawText = note.text ? note.text : '';
-                    let previewText = rawText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    let previewText = rawText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, " ");
 
                     card.innerHTML = `
                         <div class="note-content">
                             <div class="note-date"><span>${note.date || ''}</span></div>
                             <div class="note-preview">${previewText}</div>
+                        </div>
+                        <div class="note-actions">
+                            <button class="action-icon-btn action-restore" onclick="restoreNoteFromTrash(${note.id}, event)" title="Відновити">♻️ Відновити</button>
+                            <button class="action-icon-btn action-delete" onclick="permanentDeleteFromTrash(${note.id}, event)" title="Видалити">🗑️ Видалити</button>
                         </div>
                     `;
                     list.appendChild(card);
