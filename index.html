@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.12</title>
+    <title>Блокнот - v1.1.13</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -400,7 +400,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.12</b>
+            Версія додатку: <b>v1.1.13</b>
         </div>
     </div>
 
@@ -496,7 +496,8 @@
 
         function initDB() {
             try {
-                const request = window.indexedDB.open("NotepadDB", 6); 
+                // Використовуємо нову назву бази, щоб уникнути конфліктів застарілої структури
+                const request = window.indexedDB.open("NotepadDB_v2", 1); 
                 request.onupgradeneeded = function(event) {
                     db = event.target.result;
                     if (!db.objectStoreNames.contains("notes")) {
@@ -559,7 +560,7 @@
         }
 
         function manualSave() {
-            if (!db) { alert("База даних недоступна."); return; }
+            if (!db) { alert("База даних ініціалізується, спробуйте за секунду."); return; }
             autoSave();
             
             const text = document.getElementById('noteEditor').value;
@@ -725,7 +726,7 @@
         }
 
         async function syncFromGoogle() {
-            if (!db) { alert("База даних недоступна."); return; }
+            if (!db) { alert("База даних ініціалізується, спробуйте за секунду."); return; }
             const scriptUrl = localStorage.getItem('googleScriptUrl');
             if (!scriptUrl) { alert("Вкажіть посилання в Налаштуваннях (⚙️)!"); showSettings(); return; }
 
