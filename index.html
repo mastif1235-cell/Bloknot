@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.11</title>
+    <title>Блокнот - v1.1.12</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -395,11 +395,12 @@
             <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
         </div>
 
+        <button class="btn" style="margin-bottom: 10px;" onclick="syncFromGoogle()">🔄 Відновити з таблиці</button>
         <button class="btn" style="margin-bottom: 10px;" onclick="showTrash()">🗑️ Кошик видалених нотаток</button>
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.11</b>
+            Версія додатку: <b>v1.1.12</b>
         </div>
     </div>
 
@@ -495,7 +496,7 @@
 
         function initDB() {
             try {
-                const request = window.indexedDB.open("NotepadDB", 5); 
+                const request = window.indexedDB.open("NotepadDB", 6); 
                 request.onupgradeneeded = function(event) {
                     db = event.target.result;
                     if (!db.objectStoreNames.contains("notes")) {
@@ -508,6 +509,9 @@
                 request.onsuccess = function(event) {
                     db = event.target.result;
                     loadNotesList();
+                };
+                request.onerror = function(event) {
+                    console.error("Помилка відкриття IndexedDB", event);
                 };
             } catch (e) {
                 console.warn("БД недоступна", e);
@@ -598,22 +602,19 @@
             notesStore.get(id).onsuccess = function(e) {
                 const note = e.target.result;
                 if (note) {
-                    // Додаємо в кошик
                     trashStore.put(note);
                     notesStore.delete(id);
 
-                    // Обмежуємо кошик 30 записами
                     trashStore.getAll().onsuccess = function(ev) {
                         let trashItems = ev.target.result;
                         if (trashItems.length > 30) {
-                            trashItems.sort((a, b) => a.id - b.id); // Видаляємо найстаріші надлишки
+                            trashItems.sort((a, b) => a.id - b.id);
                             for (let i = 0; i < trashItems.length - 30; i++) {
                                 trashStore.delete(trashItems[i].id);
                             }
                         }
                     };
 
-                    // Відправляємо запит на видалення з Google Таблиці
                     const scriptUrl = localStorage.getItem('googleScriptUrl');
                     if (scriptUrl) {
                         fetch(scriptUrl, {
@@ -680,7 +681,6 @@
                     if (activeFolderFilter !== 'Всі') {
                         notes = notes.filter(n => (n.folder || DEFAULT_FOLDER) === activeFolderFilter);
                     }
-                    // Найновіші зверху (сортування від більшого ID / order до меншого)
                     notes.sort((a, b) => {
                         if (a.isPinned && !b.isPinned) return -1;
                         if (!a.isPinned && b.isPinned) return 1;
@@ -721,6 +721,43 @@
                 };
             } catch (e) {
                 console.warn("Помилка списку", e);
+            }
+        }
+
+        async function syncFromGoogle() {
+            if (!db) { alert("База даних недоступна."); return; }
+            const scriptUrl = localStorage.getItem('googleScriptUrl');
+            if (!scriptUrl) { alert("Вкажіть посилання в Налаштуваннях (⚙️)!"); showSettings(); return; }
+
+            try {
+                const response = await fetch(scriptUrl);
+                const data = await response.json();
+                if (!Array.isArray(data)) { alert("Некоректні дані з таблиці."); return; }
+
+                const transaction = db.transaction(["notes"], "readwrite");
+                const store = transaction.objectStore("notes");
+                store.clear();
+
+                data.forEach(item => {
+                    let parsedId = Number(item.id) || Date.parse(item.date) || (Date.now() + Math.floor(Math.random() * 1000));
+                    store.put({ 
+                        id: parsedId, 
+                        text: item.text, 
+                        date: item.date,
+                        folder: item.folder || DEFAULT_FOLDER,
+                        isPinned: false,
+                        order: parsedId 
+                    });
+                });
+
+                transaction.oncomplete = function() {
+                    loadNotesList();
+                    alert("Дані успішно відновлено з таблиці!");
+                    closeSettings();
+                };
+            } catch (e) {
+                alert("Помилка відновлення з таблиці.");
+                console.error(e);
             }
         }
 
