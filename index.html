@@ -319,7 +319,6 @@
 
         <button class="btn btn-primary" style="margin-top: 10px;" onclick="saveSettings()">Зберегти налаштування</button>
         
-        <!-- Версия приложения -->
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
             Версія додатку: <b>v1.1</b>
         </div>
@@ -410,41 +409,29 @@
         function initDB() {
             try {
                 const request = window.indexedDB.open("NotepadDB", 4); 
-                
                 request.onupgradeneeded = function(event) {
                     db = event.target.result;
                     if (!db.objectStoreNames.contains("notes")) {
                         db.createObjectStore("notes", { keyPath: "id" });
                     }
                 };
-
                 request.onsuccess = function(event) {
                     db = event.target.result;
                     loadNotesList();
                 };
-                
-                request.onerror = function(event) {
-                    console.warn("БД недоступна:", event);
-                };
             } catch (e) {
-                console.warn("IndexedDB не підтримується", e);
+                console.warn("БД недоступна", e);
             }
         }
 
         function createNewNote() {
-            try {
-                currentNoteId = Date.now();
-                document.getElementById('noteEditor').value = '';
-                document.getElementById('editorDate').innerText = new Date(currentNoteId).toLocaleString('uk-UA');
-                
-                const folderToSet = (activeFolderFilter !== 'Всі') ? activeFolderFilter : DEFAULT_FOLDER;
-                document.getElementById('noteFolderSelect').value = folderToSet;
-
-                showEditor();
-                autoSave();
-            } catch (error) {
-                console.error("Помилка:", error);
-            }
+            currentNoteId = Date.now();
+            document.getElementById('noteEditor').value = '';
+            document.getElementById('editorDate').innerText = new Date(currentNoteId).toLocaleString('uk-UA');
+            const folderToSet = (activeFolderFilter !== 'Всі') ? activeFolderFilter : DEFAULT_FOLDER;
+            document.getElementById('noteFolderSelect').value = folderToSet;
+            showEditor();
+            autoSave();
         }
 
         function openNote(note) {
@@ -456,50 +443,35 @@
         }
 
         function autoSave() {
-            if (!currentNoteId) return;
-            if (!db) return;
-            
+            if (!currentNoteId || !db) return;
             try {
                 const text = document.getElementById('noteEditor').value;
                 const folder = document.getElementById('noteFolderSelect').value;
-                
                 const transaction = db.transaction(["notes"], "readwrite");
                 const store = transaction.objectStore("notes");
-                const getReq = store.get(currentNoteId);
-
-                getReq.onsuccess = function() {
-                    let note = getReq.result || {};
+                store.get(currentNoteId).onsuccess = function(e) {
+                    let note = e.target.result || {};
                     note.id = currentNoteId;
                     note.text = text;
-                    note.date = note.date || new Date().toISOString(); 
+                    note.date = note.date || new Date().toLocaleString('uk-UA'); 
                     note.folder = folder;
                     note.isPinned = note.isPinned || false;
                     note.order = note.order || currentNoteId; 
-
                     store.put(note);
                 };
             } catch (e) {
-                console.warn("Не вдалося зберегти в БД", e);
+                console.warn("Помилка автозбереження", e);
             }
         }
 
         function manualSave() {
-            if (window.location.protocol === 'content:' || window.location.protocol === 'file:') {
-                alert("Збереження неможливе у режимі попереднього перегляду! Відкрийте додаток через завантажений GitHub сайт.");
-                return;
-            }
-            if (!db) {
-                alert("Помилка бази даних.");
-                return;
-            }
-            
+            if (!db) { alert("База даних недоступна."); return; }
             autoSave();
             alert("Нотатку збережено!");
         }
 
         function deleteNote(id, event) {
             if(event) event.stopPropagation(); 
-            if (!db) { alert("База даних недоступна."); return; }
             if (confirm("Точно видалити цей запис?")) {
                 db.transaction(["notes"], "readwrite").objectStore("notes").delete(id);
                 loadNotesList();
@@ -508,9 +480,7 @@
 
         function deleteCurrentNote() {
             if (currentNoteId && confirm("Точно видалити цей запис?")) {
-                if (db) {
-                    db.transaction(["notes"], "readwrite").objectStore("notes").delete(currentNoteId);
-                }
+                if (db) db.transaction(["notes"], "readwrite").objectStore("notes").delete(currentNoteId);
                 goBack();
             }
         }
@@ -518,7 +488,6 @@
         function togglePin(id, event) {
             if(event) event.stopPropagation();
             if(!db) return;
-            
             const store = db.transaction(["notes"], "readwrite").objectStore("notes");
             store.get(id).onsuccess = function(e) {
                 let note = e.target.result;
@@ -530,7 +499,6 @@
         function moveNote(index, direction, event) {
             if(event) event.stopPropagation();
             if(!db) return;
-            
             if (direction === 'up' && index === 0) return;
             if (direction === 'down' && index === currentNotesArray.length - 1) return;
 
@@ -554,44 +522,31 @@
             try {
                 const transaction = db.transaction(["notes"], "readonly");
                 const store = transaction.objectStore("notes");
-                const request = store.getAll();
-
-                request.onsuccess = function(event) {
+                store.getAll().onsuccess = function(event) {
                     let notes = event.target.result;
-                    
                     if (activeFolderFilter !== 'Всі') {
                         notes = notes.filter(n => (n.folder || DEFAULT_FOLDER) === activeFolderFilter);
                     }
-
                     notes.sort((a, b) => {
                         if (a.isPinned && !b.isPinned) return -1;
                         if (!a.isPinned && b.isPinned) return 1;
-                        const orderA = a.order || a.id;
-                        const orderB = b.order || b.id;
-                        return orderB - orderA; 
+                        return (b.order || b.id) - (a.order || a.id); 
                     });
-
                     currentNotesArray = notes; 
                     const list = document.getElementById('notesList');
                     list.innerHTML = '';
-                    
                     if (notes.length === 0) {
                         list.innerHTML = `<div style="text-align:center; color:var(--text-muted); margin-top:20px;">Немає записів</div>`;
                         return;
                     }
-
                     notes.forEach((note, index) => {
-                        let displayDate = typeof note.date === 'number' ? new Date(note.date) : new Date(note.date);
-                        if (isNaN(displayDate)) displayDate = new Date();
-                        
-                        const dateStr = displayDate.toLocaleString('uk-UA');
+                        const dateStr = note.date || new Date(note.id).toLocaleString('uk-UA');
                         const previewText = note.text ? note.text.substring(0, 70) + '...' : 'Порожня нотатка...';
                         const folderName = note.folder || DEFAULT_FOLDER;
                         const pinIcon = note.isPinned ? '📍' : '📌';
 
                         const card = document.createElement('div');
                         card.className = `note-card ${note.isPinned ? 'pinned' : ''}`;
-                        
                         card.innerHTML = `
                             <div class="note-content" onclick='openNote(${JSON.stringify(note).replace(/'/g, "\\'")})'>
                                 <div class="note-date">
@@ -657,7 +612,6 @@
             recognition = new SpeechRecognition();
             recognition.continuous = false;
             recognition.interimResults = false;
-
             recognition.onresult = function(event) {
                 const finalTranscript = event.results[0][0].transcript;
                 if (finalTranscript) {
@@ -667,18 +621,11 @@
                     autoSave();
                 }
             };
-
             recognition.onerror = function(event) {
-                console.error("Голосова помилка: ", event.error);
-                if (event.error !== 'no-speech') {
-                    if (isRecording) toggleMic();
-                }
+                if (event.error !== 'no-speech' && isRecording) toggleMic();
             };
-            
             recognition.onend = function() {
-                if (isRecording) {
-                    recognition.start();
-                }
+                if (isRecording) recognition.start();
             };
         }
 
@@ -687,7 +634,6 @@
                 alert("Ваш браузер не підтримує голосовий ввід.");
                 return;
             }
-
             const btn = document.getElementById('micBtn');
             if (isRecording) {
                 isRecording = false;
@@ -719,6 +665,7 @@
             }
         }
 
+        // НАДІЙНИЙ МЕТОД ВІДПРАВКИ ЧЕРЕЗ ФОРМУ (Побітний обхід блокувань CORS)
         function sendToGoogle() {
             const scriptUrl = localStorage.getItem('googleScriptUrl');
             if (!scriptUrl) {
@@ -737,31 +684,46 @@
             btn.innerText = "⏳ ...";
             btn.disabled = true;
 
-            fetch(scriptUrl, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ text: text, date: dateStr })
-            }).then(() => {
-                alert("Успішно надіслано в таблицю!");
-            }).catch(error => {
-                console.error("Помилка:", error);
-                alert("Помилка при відправці. Перевір інтернет.");
-            }).finally(() => {
+            // Створюємо приховану форму для гарантованої відправки в Google Таблицю
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = scriptUrl;
+            form.target = 'hidden_iframe';
+
+            const inputData = document.createElement('input');
+            inputData.type = 'hidden';
+            inputData.name = 'data';
+            inputData.value = JSON.stringify({ text: text, date: dateStr });
+            form.appendChild(inputData);
+
+            let iframe = document.getElementById('hidden_iframe');
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                iframe.name = 'hidden_iframe';
+                iframe.id = 'hidden_iframe';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+
+            setTimeout(() => {
                 btn.innerText = originalText;
                 btn.disabled = false;
-            });
+                alert("Надіслано в таблицю!");
+            }, 1000);
         }
 
         async function syncFromGoogle() {
             if (!db) {
-                alert("База даних недоступна. Відкрийте через розгорнутий сайт GitHub.");
+                alert("База даних недоступна.");
                 return;
             }
-
             const scriptUrl = localStorage.getItem('googleScriptUrl');
             if (!scriptUrl) {
-                alert("Спочатку вкажіть посилання на Google Таблицю в Налаштуваннях (⚙️)!");
+                alert("Спочатку вкажіть посилання в Налаштуваннях (⚙️)!");
                 showSettings();
                 return;
             }
@@ -774,14 +736,12 @@
             try {
                 const response = await fetch(scriptUrl);
                 const data = await response.json();
-                
                 const transaction = db.transaction(["notes"], "readwrite");
                 const store = transaction.objectStore("notes");
                 
                 data.forEach(item => {
                     let parsedId = Date.parse(item.date);
                     if (isNaN(parsedId)) parsedId = Date.now() + Math.floor(Math.random() * 1000);
-                    
                     store.put({ 
                         id: parsedId, 
                         text: item.text, 
@@ -795,8 +755,7 @@
                 alert("Дані успішно синхронізовані!");
                 loadNotesList();
             } catch (e) {
-                alert("Помилка синхронізації. Перевірте посилання.");
-                console.error(e);
+                alert("Помилка синхронізації.");
             } finally {
                 btn.innerText = originalText;
                 btn.disabled = false;
