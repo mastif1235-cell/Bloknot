@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.19</title>
+    <title>Блокнот - v1.1.20</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -129,9 +129,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            /* Жорсткий захист від розриву картки на головному екрані */
-            max-height: 95px; 
             flex-shrink: 0;
         }
         
@@ -141,26 +138,27 @@
         }
         
         .note-content {
-            padding: 10px 16px 6px 16px;
+            padding: 10px 16px 8px 16px;
             cursor: pointer;
-            height: 52px;
-            overflow: hidden;
         }
         
         .note-date { 
             font-size: 0.75em; 
             color: var(--text-muted); 
-            margin-bottom: 2px; 
+            margin-bottom: 4px; 
             display: flex; 
             justify-content: space-between; 
         }
         
-        /* Залізно в один рядок, жодних переносів і розтягувань */
+        /* Залізно в один рядок з трикрапкою, клікабельність відновлено повністю */
         .note-preview { 
             font-size: 0.9em; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            word-break: break-all;
             line-height: 20px;
         }
         
@@ -441,7 +439,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.19</b>
+            Версія додатку: <b>v1.1.20</b>
         </div>
     </div>
 
