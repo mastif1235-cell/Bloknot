@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.28</title>
+    <title>Блокнот - v1.1.29</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -114,6 +114,7 @@
             font-size: 14px;
             white-space: nowrap;
             cursor: pointer;
+            user-select: none;
         }
         
         .folder-chip.active-folder {
@@ -485,7 +486,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.28</b>
+            Версія додатку: <b>v1.1.29</b>
         </div>
     </div>
 
@@ -580,9 +581,14 @@
             btn.className = `folder-chip ${isActive ? 'active-folder' : ''}`;
             btn.innerText = name;
             btn.onclick = () => {
-                activeFolderFilter = name;
-                renderFoldersBar();
-                loadNotesList();
+                // Якщо папка користувацька і вона вже вибрана - запускаємо перейменування/видалення
+                if (isActive && name !== 'Всі' && name !== DEFAULT_FOLDER) {
+                    manageFolder(name);
+                } else {
+                    activeFolderFilter = name;
+                    renderFoldersBar();
+                    loadNotesList();
+                }
             };
             return btn;
         }
@@ -595,6 +601,67 @@
                 renderFoldersBar();
                 updateFolderSelects();
             }
+        }
+
+        function manageFolder(name) {
+            const newName = prompt(`Керування папкою "${name}"\n\nВведіть нову назву для перейменування.\nАбо залиште поле ПУСТИМ і натисніть ОК, щоб видалити папку.`, name);
+            
+            if (newName === null) return; 
+            
+            const trimmedName = newName.trim();
+            
+            if (trimmedName === "") {
+                if (confirm(`Ви впевнені, що хочете ВИДАЛИТИ папку "${name}"?\nУсі записи з неї будуть переміщені в "${DEFAULT_FOLDER}".`)) {
+                    customFolders = customFolders.filter(f => f !== name);
+                    localStorage.setItem('appFolders', JSON.stringify(customFolders));
+                    moveNotesToDefault(name);
+                    activeFolderFilter = 'Всі';
+                    renderFoldersBar();
+                    updateFolderSelects();
+                }
+            } else if (trimmedName !== name && trimmedName !== 'Всі' && trimmedName !== DEFAULT_FOLDER && !customFolders.includes(trimmedName)) {
+                const index = customFolders.indexOf(name);
+                if (index > -1) {
+                    customFolders[index] = trimmedName;
+                    localStorage.setItem('appFolders', JSON.stringify(customFolders));
+                    renameNotesFolder(name, trimmedName);
+                    activeFolderFilter = trimmedName;
+                    renderFoldersBar();
+                    updateFolderSelects();
+                }
+            }
+        }
+
+        function moveNotesToDefault(oldFolder) {
+            if(!db) return;
+            const tx = db.transaction(["notes"], "readwrite");
+            const store = tx.objectStore("notes");
+            store.getAll().onsuccess = function(e) {
+                const notes = e.target.result || [];
+                notes.forEach(note => {
+                    if (note.folder === oldFolder) {
+                        note.folder = DEFAULT_FOLDER;
+                        store.put(note);
+                    }
+                });
+                tx.oncomplete = () => loadNotesList();
+            };
+        }
+
+        function renameNotesFolder(oldFolder, newFolder) {
+            if(!db) return;
+            const tx = db.transaction(["notes"], "readwrite");
+            const store = tx.objectStore("notes");
+            store.getAll().onsuccess = function(e) {
+                const notes = e.target.result || [];
+                notes.forEach(note => {
+                    if (note.folder === oldFolder) {
+                        note.folder = newFolder;
+                        store.put(note);
+                    }
+                });
+                tx.oncomplete = () => loadNotesList();
+            };
         }
 
         function updateFolderSelects() {
@@ -942,7 +1009,6 @@
             }
         }
         
-        // Функції для Бекапу
         function exportBackup() {
             if (!db) return;
             const store = db.transaction(["notes"], "readonly").objectStore("notes");
