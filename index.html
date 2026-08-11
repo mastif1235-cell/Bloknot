@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.27</title>
+    <title>Блокнот - v1.1.28</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -77,6 +77,20 @@
             color: var(--primary-color); 
             font-size: 20px; 
         }
+
+        /* Пошук */
+        #searchInput {
+            width: 100%;
+            background: var(--surface-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 15px;
+            margin-bottom: 12px;
+            outline: none;
+        }
+        #searchInput::placeholder { color: var(--text-muted); }
 
         .folders-bar {
             display: flex;
@@ -340,6 +354,15 @@
             outline: none;
         }
 
+        /* Лічильник символів */
+        .text-counter {
+            text-align: right;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            margin-bottom: 8px;
+        }
+
         .form-group { 
             margin-bottom: 16px; 
             display: flex; 
@@ -376,17 +399,22 @@
 </head>
 <body>
 
+    <!-- Головний екран -->
     <div id="listView" class="active">
         <div class="header-row">
             <h2>Мої записи</h2>
             <button class="btn btn-icon-only" onclick="showSettings()">⚙️</button>
         </div>
         
+        <!-- Рядок пошуку -->
+        <input type="text" id="searchInput" placeholder="🔍 Пошук записів..." oninput="loadNotesList()">
+        
         <div class="folders-bar" id="foldersBar"></div>
         <div id="notesList"></div>
         <button id="fab" onclick="createNewNote()">+</button>
     </div>
 
+    <!-- Редактор запису -->
     <div id="editorView">
         <div class="header-row">
             <div class="top-actions">
@@ -420,9 +448,13 @@
             <button class="btn" id="micBtn" onclick="toggleMic()">🎤 Голосовий ввід</button>
         </div>
 
-        <textarea id="noteEditor" placeholder="Почни писати або говорити..." oninput="autoSave()"></textarea>
+        <textarea id="noteEditor" placeholder="Почни писати або говорити..." oninput="autoSave(); updateCounter()"></textarea>
+        
+        <!-- Лічильник тексту -->
+        <div id="textCounter" class="text-counter">0 символів, 0 слів</div>
     </div>
 
+    <!-- Налаштування -->
     <div id="settingsView">
         <div class="header-row">
             <h2>Налаштування</h2>
@@ -444,13 +476,20 @@
 
         <button class="btn" style="margin-bottom: 10px;" onclick="syncWithGoogleTable()">🔄 Синхронізувати з таблицею</button>
         <button class="btn" style="margin-bottom: 10px;" onclick="showTrash()">🗑️ Кошик видалених нотаток</button>
+        
+        <!-- Локальний бекап -->
+        <button class="btn" style="margin-bottom: 10px;" onclick="exportBackup()">💾 Завантажити резервну копію</button>
+        <button class="btn" style="margin-bottom: 10px;" onclick="document.getElementById('importFile').click()">📂 Відновити з файлу</button>
+        <input type="file" id="importFile" style="display:none" accept=".json" onchange="importBackup(event)">
+
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.27</b>
+            Версія додатку: <b>v1.1.28</b>
         </div>
     </div>
 
+    <!-- Кошик -->
     <div id="trashView">
         <div class="header-row">
             <h2>Кошик</h2>
@@ -568,7 +607,6 @@
 
         function initDB() {
             try {
-                // Піднімаємо версію до v3, щоб оновити/створити чисту базу
                 const request = window.indexedDB.open("NotepadDB_v3", 1); 
                 request.onupgradeneeded = function(event) {
                     db = event.target.result;
@@ -598,6 +636,7 @@
             const folderToSet = (activeFolderFilter !== 'Всі') ? activeFolderFilter : DEFAULT_FOLDER;
             document.getElementById('noteFolderSelect').value = folderToSet;
             showEditor();
+            updateCounter();
             autoSave();
         }
 
@@ -607,6 +646,14 @@
             document.getElementById('editorDate').innerText = new Date(note.date).toLocaleString('uk-UA');
             document.getElementById('noteFolderSelect').value = note.folder || DEFAULT_FOLDER;
             showEditor();
+            updateCounter();
+        }
+
+        function updateCounter() {
+            const text = document.getElementById('noteEditor').value;
+            const chars = text.length;
+            const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+            document.getElementById('textCounter').innerText = `${chars} символів, ${words} слів`;
         }
 
         function autoSave() {
@@ -783,27 +830,38 @@
         function loadNotesList() {
             if (!db) return;
             try {
+                const searchQuery = document.getElementById('searchInput').value.toLowerCase();
                 const transaction = db.transaction(["notes"], "readonly");
                 const store = transaction.objectStore("notes");
+                
                 store.getAll().onsuccess = function(event) {
                     let notes = event.target.result || [];
+                    
                     notes = notes.filter(n => n.text && n.text.trim() !== '' && !n.text.includes('function doGet'));
 
                     if (activeFolderFilter !== 'Всі') {
                         notes = notes.filter(n => (n.folder || DEFAULT_FOLDER) === activeFolderFilter);
                     }
+                    
+                    if (searchQuery) {
+                        notes = notes.filter(n => n.text.toLowerCase().includes(searchQuery));
+                    }
+
                     notes.sort((a, b) => {
                         if (a.isPinned && !b.isPinned) return -1;
                         if (!a.isPinned && b.isPinned) return 1;
                         return (b.order || b.id) - (a.order || a.id); 
                     });
+                    
                     currentNotesArray = notes; 
                     const list = document.getElementById('notesList');
                     list.innerHTML = '';
+                    
                     if (notes.length === 0) {
                         list.innerHTML = `<div style="text-align:center; color:var(--text-muted); margin-top:20px;">Немає записів</div>`;
                         return;
                     }
+                    
                     notes.forEach((note, index) => {
                         const dateStr = note.date || new Date(note.id).toLocaleString('uk-UA');
                         
@@ -883,6 +941,59 @@
                 alert("Помилка синхронізації. Перевірте правильність посилання Web App URL у налаштуваннях.");
             }
         }
+        
+        // Функції для Бекапу
+        function exportBackup() {
+            if (!db) return;
+            const store = db.transaction(["notes"], "readonly").objectStore("notes");
+            store.getAll().onsuccess = function(e) {
+                const notes = e.target.result || [];
+                if (notes.length === 0) {
+                    alert("Немає записів для збереження.");
+                    return;
+                }
+                const dataStr = JSON.stringify(notes, null, 2);
+                const blob = new Blob([dataStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Блокнот_Копія_${new Date().toLocaleDateString('uk-UA').replace(/\./g, '-')}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+        }
+
+        function importBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedNotes = JSON.parse(e.target.result);
+                    if (!Array.isArray(importedNotes)) throw new Error("Невірний формат файлу");
+                    
+                    const tx = db.transaction(["notes"], "readwrite");
+                    const store = tx.objectStore("notes");
+                    
+                    importedNotes.forEach(note => {
+                        if (note.id && note.text) {
+                            store.put(note);
+                        }
+                    });
+                    
+                    tx.oncomplete = function() {
+                        loadNotesList();
+                        alert("Записи успішно відновлено з файлу!");
+                        closeSettings();
+                    };
+                } catch (err) {
+                    alert("Помилка читання файлу резервної копії.");
+                    console.error(err);
+                }
+                event.target.value = ''; 
+            };
+            reader.readAsText(file);
+        }
 
         function showEditor() {
             document.getElementById('listView').classList.remove('active');
@@ -898,6 +1009,7 @@
             document.getElementById('editorView').classList.remove('active');
             document.getElementById('trashView').classList.remove('active');
             document.getElementById('listView').classList.add('active');
+            document.getElementById('searchInput').value = ''; 
             loadNotesList();
         }
 
@@ -978,6 +1090,7 @@
                     const currentText = editor.value;
                     editor.value = currentText + (currentText.endsWith(' ') || currentText === '' ? '' : ' ') + finalTranscript.trim();
                     autoSave();
+                    updateCounter();
                 }
             };
             recognition.onerror = function(event) {
