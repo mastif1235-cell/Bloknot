@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Блокнот - v1.1.29</title>
+    <title>Блокнот - v1.2.0</title>
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff8c00">
@@ -486,7 +486,7 @@
         <button class="btn btn-primary" onclick="saveSettings()">Зберегти налаштування</button>
         
         <div style="text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 13px;">
-            Версія додатку: <b>v1.1.29</b>
+            Версія додатку: <b>v1.2.0</b>
         </div>
     </div>
 
@@ -509,6 +509,15 @@
         let customFolders = [];
         let activeFolderFilter = 'Всі';
         let currentNotesArray = []; 
+        let autoSaveTimer = null;
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+        }
 
         window.onload = function() {
             const savedTheme = localStorage.getItem('appTheme') || 'dark';
@@ -526,6 +535,10 @@
             updateFolderSelects();
 
             initDB();
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW не зареєстровано', err));
+            }
         };
 
         window.onclick = function(event) {
@@ -704,7 +717,6 @@
             document.getElementById('noteFolderSelect').value = folderToSet;
             showEditor();
             updateCounter();
-            autoSave();
         }
 
         function openNote(note) {
@@ -724,6 +736,11 @@
         }
 
         function autoSave() {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(autoSaveNow, 400);
+        }
+
+        function autoSaveNow() {
             if (!currentNoteId || !db) return;
             try {
                 const text = document.getElementById('noteEditor').value;
@@ -745,9 +762,16 @@
             }
         }
 
+        function deleteEmptyNote(id) {
+            if (!db) return;
+            const tx = db.transaction(["notes"], "readwrite");
+            tx.objectStore("notes").delete(id);
+        }
+
         function manualSave() {
             if (!db) { alert("База даних ініціалізується, спробуйте за секунду."); return; }
-            autoSave();
+            clearTimeout(autoSaveTimer);
+            autoSaveNow();
             
             const text = document.getElementById('noteEditor').value;
             const dateStr = document.getElementById('editorDate').innerText;
@@ -855,6 +879,7 @@
 
         function deleteCurrentNote() {
             if (currentNoteId) {
+                clearTimeout(autoSaveTimer);
                 const idToDelete = currentNoteId;
                 currentNoteId = null; 
                 deleteNote(idToDelete);
@@ -932,10 +957,9 @@
                     notes.forEach((note, index) => {
                         const dateStr = note.date || new Date(note.id).toLocaleString('uk-UA');
                         
-                        let rawText = note.text ? note.text : '';
-                        let previewText = rawText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, " ");
+                        let previewText = escapeHtml(note.text || '').replace(/\n/g, " ");
 
-                        const folderName = note.folder || DEFAULT_FOLDER;
+                        const folderName = escapeHtml(note.folder || DEFAULT_FOLDER);
                         const pinIcon = note.isPinned ? '📍' : '📌';
 
                         const card = document.createElement('div');
@@ -943,7 +967,7 @@
                         card.innerHTML = `
                             <div class="note-content">
                                 <div class="note-date">
-                                    <span>${dateStr}</span>
+                                    <span>${escapeHtml(dateStr)}</span>
                                     <span style="color:var(--primary-color)">📁 ${folderName}</span>
                                 </div>
                                 <div class="note-preview">${previewText}</div>
@@ -986,19 +1010,36 @@
                 const transaction = db.transaction(["notes"], "readwrite");
                 const store = transaction.objectStore("notes");
 
+                let foldersChanged = false;
+
                 validTableNotes.forEach(item => {
                     let parsedId = Number(item.id) || Date.parse(item.date) || (Date.now() + Math.floor(Math.random() * 1000));
-                    store.put({ 
-                        id: parsedId, 
-                        text: item.text, 
-                        date: item.date,
-                        folder: item.folder || DEFAULT_FOLDER,
-                        isPinned: false,
-                        order: parsedId 
-                    });
+                    const folder = item.folder || DEFAULT_FOLDER;
+
+                    if (folder !== DEFAULT_FOLDER && !customFolders.includes(folder)) {
+                        customFolders.push(folder);
+                        foldersChanged = true;
+                    }
+
+                    store.get(parsedId).onsuccess = function(e) {
+                        const existing = e.target.result;
+                        store.put({
+                            id: parsedId,
+                            text: item.text,
+                            date: item.date,
+                            folder: folder,
+                            isPinned: existing ? existing.isPinned || false : false,
+                            order: existing ? (existing.order || parsedId) : parsedId
+                        });
+                    };
                 });
 
                 transaction.oncomplete = function() {
+                    if (foldersChanged) {
+                        localStorage.setItem('appFolders', JSON.stringify(customFolders));
+                        renderFoldersBar();
+                        updateFolderSelects();
+                    }
                     loadNotesList();
                     alert("Синхронізація успішна! Записи підтягнуто з таблиці.");
                     closeSettings();
@@ -1040,14 +1081,25 @@
                     
                     const tx = db.transaction(["notes"], "readwrite");
                     const store = tx.objectStore("notes");
+                    let foldersChanged = false;
                     
                     importedNotes.forEach(note => {
                         if (note.id && note.text) {
+                            const folder = note.folder || DEFAULT_FOLDER;
+                            if (folder !== DEFAULT_FOLDER && !customFolders.includes(folder)) {
+                                customFolders.push(folder);
+                                foldersChanged = true;
+                            }
                             store.put(note);
                         }
                     });
                     
                     tx.oncomplete = function() {
+                        if (foldersChanged) {
+                            localStorage.setItem('appFolders', JSON.stringify(customFolders));
+                            renderFoldersBar();
+                            updateFolderSelects();
+                        }
                         loadNotesList();
                         alert("Записи успішно відновлено з файлу!");
                         closeSettings();
@@ -1070,7 +1122,15 @@
 
         function goBack() {
             if (isRecording) toggleMic();
-            autoSave();
+            clearTimeout(autoSaveTimer);
+            if (currentNoteId) {
+                const text = document.getElementById('noteEditor').value;
+                if (text.trim() === '') {
+                    deleteEmptyNote(currentNoteId);
+                } else {
+                    autoSaveNow();
+                }
+            }
             currentNoteId = null;
             document.getElementById('editorView').classList.remove('active');
             document.getElementById('trashView').classList.remove('active');
@@ -1119,12 +1179,11 @@
                     const card = document.createElement('div');
                     card.className = 'note-card';
                     
-                    let rawText = note.text ? note.text : '';
-                    let previewText = rawText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, " ");
+                    let previewText = escapeHtml(note.text || '').replace(/\n/g, " ");
 
                     card.innerHTML = `
                         <div class="note-content">
-                            <div class="note-date"><span>${note.date || ''}</span></div>
+                            <div class="note-date"><span>${escapeHtml(note.date || '')}</span></div>
                             <div class="note-preview">${previewText}</div>
                         </div>
                         <div class="note-actions">
